@@ -240,9 +240,14 @@ export async function saveDraftTasks(date: string, tasks: Task[]) {
         user_id: user.id,
         date,
         tasks: tasks as any,
+      }, {
+        onConflict: 'user_id,date'
       });
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error saving draft tasks:', error);
+      throw error;
+    }
   }
   
   // Also save locally as backup
