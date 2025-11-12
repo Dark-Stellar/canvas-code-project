@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MobileLayout } from "@/components/MobileLayout";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { getAllDailyReports } from "@/lib/storage";
-import { TrendingUp, Calendar as CalendarIcon, Target, Zap } from "lucide-react";
+import { TrendingUp, Calendar as CalendarIcon, Target, Zap, Edit } from "lucide-react";
 import type { DailyReport } from "@/types";
 import { formatDisplayDate } from "@/lib/dates";
 
 const Analytics = () => {
+  const navigate = useNavigate();
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -128,10 +131,10 @@ const Analytics = () => {
         )}
         
         <Card className="p-4">
-          <h3 className="font-semibold mb-3">Recent Activity</h3>
+          <h3 className="font-semibold mb-3">Daily Progress (Editable)</h3>
           <div className="space-y-3">
-            {last7Days.map((report) => (
-              <div key={report.id} className="flex items-center justify-between">
+            {reports.slice(0, 30).map((report) => (
+              <div key={report.id} className="flex items-center justify-between group">
                 <div className="text-sm">
                   {formatDisplayDate(new Date(report.date))}
                 </div>
@@ -145,12 +148,20 @@ const Analytics = () => {
                       style={{ width: `${report.productivityPercent}%` }}
                     />
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => navigate(`/day/${report.date}`)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))}
           </div>
           
-          {last7Days.length === 0 && (
+          {reports.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-4">
               No data yet. Start tracking your productivity!
             </p>

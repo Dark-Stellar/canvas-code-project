@@ -102,20 +102,24 @@ const Calendar = () => {
               return (
                 <button
                   key={dateStr}
-                  onClick={() => hasReport && navigate(`/day/${dateStr}`)}
+                  onClick={() => navigate(`/day/${dateStr}`)}
                   className={cn(
-                    "aspect-square rounded-lg flex flex-col items-center justify-center relative transition-colors",
-                    hasReport && "cursor-pointer hover:bg-accent/10",
+                    "aspect-square rounded-lg flex flex-col items-center justify-center relative transition-colors cursor-pointer hover:bg-accent/10",
                     isTodayDate && "ring-2 ring-primary",
                     !hasReport && "text-muted-foreground"
                   )}
                 >
                   <div className="text-sm font-medium">{format(day, "d")}</div>
                   {hasReport && (
-                    <div className={cn(
-                      "w-1.5 h-1.5 rounded-full mt-1",
-                      getProductivityColor(report.productivityPercent)
-                    )} />
+                    <>
+                      <div className={cn(
+                        "w-1.5 h-1.5 rounded-full mt-0.5",
+                        getProductivityColor(report.productivityPercent)
+                      )} />
+                      <div className="text-[10px] font-semibold mt-0.5">
+                        {Math.round(report.productivityPercent)}%
+                      </div>
+                    </>
                   )}
                 </button>
               );

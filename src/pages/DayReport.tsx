@@ -17,7 +17,7 @@ const DayReport = () => {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [notes, setNotes] = useState("");
-  const [isSaved, setIsSaved] = useState(false);
+  const [reportId, setReportId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
@@ -34,7 +34,7 @@ const DayReport = () => {
     if (report) {
       setTasks(report.tasks);
       setNotes(report.notes || "");
-      setIsSaved(true);
+      setReportId(report.id);
     } else {
       const draft = await getDraftTasks(date);
       if (draft) {
@@ -49,13 +49,19 @@ const DayReport = () => {
     setTasks(tasks.map(t => t.id === id ? updated : t));
   }
   
+  function deleteTask(id: string) {
+    if (tasks.length > 1) {
+      setTasks(tasks.filter(t => t.id !== id));
+    }
+  }
+  
   async function saveReport() {
     if (!date) return;
     
     const productivity = calculateProductivity(tasks);
     
     const report: DailyReport = {
-      id: crypto.randomUUID(),
+      id: reportId || crypto.randomUUID(),
       date,
       tasks,
       productivityPercent: productivity,
@@ -66,32 +72,46 @@ const DayReport = () => {
     
     await saveDailyReport(report);
     await clearDraftTasks(date);
-    setIsSaved(true);
-    toast.success("Daily report saved!");
+    setReportId(report.id);
+    toast.success("Progress saved!");
   }
   
-  function exportData() {
+  async function exportData() {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    
     const productivity = calculateProductivity(tasks);
-    const data = {
-      date,
-      productivity: `${productivity}%`,
-      tasks: tasks.map(t => ({
-        title: t.title,
-        weight: `${t.weight}%`,
-        completion: `${t.completionPercent}%`,
-      })),
-      notes,
-    };
+    const doc = new jsPDF() as any;
     
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `glow-report-${date}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    doc.setFontSize(20);
+    doc.text("Glow Daily Report", 14, 22);
     
-    toast.success("Report exported!");
+    doc.setFontSize(12);
+    doc.text(`Date: ${date && formatDisplayDate(new Date(date))}`, 14, 32);
+    doc.text(`Productivity: ${Math.round(productivity)}%`, 14, 40);
+    
+    const tableData = tasks.map(t => [
+      t.title,
+      `${t.weight}%`,
+      `${t.completionPercent}%`,
+    ]);
+    
+    autoTable(doc, {
+      head: [['Task', 'Weight', 'Completion']],
+      body: tableData,
+      startY: 50,
+    });
+    
+    if (notes) {
+      const finalY = (doc as any).lastAutoTable.finalY || 50;
+      doc.text("Notes:", 14, finalY + 10);
+      doc.setFontSize(10);
+      const splitNotes = doc.splitTextToSize(notes, 180);
+      doc.text(splitNotes, 14, finalY + 18);
+    }
+    
+    doc.save(`glow-report-${date}.pdf`);
+    toast.success("PDF exported!");
   }
   
   if (loading) {
@@ -132,9 +152,7 @@ const DayReport = () => {
         
         <div className="text-center">
           <h1 className="text-2xl font-bold">{date && formatDisplayDate(new Date(date))}</h1>
-          {isSaved && (
-            <p className="text-sm text-success">✓ Saved</p>
-          )}
+          <p className="text-sm text-muted-foreground">Edit progress anytime</p>
         </div>
         
         <div className="flex justify-center py-4">
@@ -147,8 +165,8 @@ const DayReport = () => {
               key={task.id}
               task={task}
               onUpdate={(updated) => updateTask(task.id, updated)}
-              onDelete={() => {}}
-              locked={isSaved}
+              onDelete={() => deleteTask(task.id)}
+              locked={false}
             />
           ))}
         </div>
@@ -160,20 +178,17 @@ const DayReport = () => {
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Add notes about your day..."
             rows={4}
-            disabled={isSaved}
           />
         </Card>
         
         <div className="flex gap-2 pb-8">
-          {!isSaved && (
-            <Button onClick={saveReport} className="flex-1">
-              <Save className="h-4 w-4 mr-2" />
-              Save Report
-            </Button>
-          )}
-          <Button onClick={exportData} variant="outline" className={isSaved ? "flex-1" : ""}>
+          <Button onClick={saveReport} className="flex-1">
+            <Save className="h-4 w-4 mr-2" />
+            Save Progress
+          </Button>
+          <Button onClick={exportData} variant="outline">
             <Download className="h-4 w-4 mr-2" />
-            Export
+            PDF
           </Button>
         </div>
       </div>
