@@ -7,6 +7,7 @@ import { getAllDailyReports } from "@/lib/storage";
 import { TrendingUp, Calendar as CalendarIcon, Target, Zap, Edit } from "lucide-react";
 import type { DailyReport } from "@/types";
 import { formatDisplayDate } from "@/lib/dates";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Analytics = () => {
   const navigate = useNavigate();
@@ -127,6 +128,86 @@ const Analytics = () => {
                 {Math.round(bestDay.productivityPercent)}%
               </div>
             </div>
+          </Card>
+        )}
+        
+        {/* Productivity Trend Chart */}
+        {reports.length > 0 && (
+          <Card className="p-4">
+            <h3 className="font-semibold mb-3">Productivity Trend (Last 30 Days)</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={reports.slice(0, 30).reverse().map(r => ({
+                date: new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                productivity: Math.round(r.productivityPercent)
+              }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="date" 
+                  fontSize={10}
+                  stroke="hsl(var(--muted-foreground))"
+                />
+                <YAxis 
+                  fontSize={10}
+                  stroke="hsl(var(--muted-foreground))"
+                  domain={[0, 100]}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="productivity" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={2}
+                  dot={{ fill: 'hsl(var(--primary))' }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+        )}
+        
+        {/* Weekly Average Chart */}
+        {reports.length >= 7 && (
+          <Card className="p-4">
+            <h3 className="font-semibold mb-3">Weekly Averages</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={Array.from({ length: Math.min(4, Math.floor(reports.length / 7)) }, (_, i) => {
+                const weekReports = reports.slice(i * 7, (i + 1) * 7);
+                const avg = weekReports.reduce((sum, r) => sum + r.productivityPercent, 0) / weekReports.length;
+                return {
+                  week: `Week ${i + 1}`,
+                  average: Math.round(avg)
+                };
+              }).reverse()}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="week" 
+                  fontSize={12}
+                  stroke="hsl(var(--muted-foreground))"
+                />
+                <YAxis 
+                  fontSize={10}
+                  stroke="hsl(var(--muted-foreground))"
+                  domain={[0, 100]}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                  }}
+                />
+                <Bar 
+                  dataKey="average" 
+                  fill="hsl(var(--accent))" 
+                  radius={[8, 8, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
           </Card>
         )}
         

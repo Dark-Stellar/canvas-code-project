@@ -15,10 +15,31 @@ const Settings = () => {
   const [morningTime, setMorningTime] = useState("09:00");
   const [eveningTime, setEveningTime] = useState("21:00");
   const [loading, setLoading] = useState(true);
+  const [browserNotificationsGranted, setBrowserNotificationsGranted] = useState(false);
   
   useEffect(() => {
     loadPreferences();
+    checkNotificationPermission();
   }, []);
+  
+  async function checkNotificationPermission() {
+    if ('Notification' in window) {
+      setBrowserNotificationsGranted(Notification.permission === 'granted');
+    }
+  }
+  
+  async function requestNotificationPermission() {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      setBrowserNotificationsGranted(permission === 'granted');
+      if (permission === 'granted') {
+        toast.success("Browser notifications enabled!");
+        scheduleNotifications();
+      } else {
+        toast.error("Notification permission denied");
+      }
+    }
+  }
   
   async function loadPreferences() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -38,6 +59,44 @@ const Settings = () => {
     setLoading(false);
   }
   
+  
+  function scheduleNotifications() {
+    if (!browserNotificationsGranted || !notificationsEnabled) return;
+    
+    // Schedule daily reminders (this is a simplified version)
+    // In production, you'd use a service worker or background task
+    const now = new Date();
+    const [morningHour, morningMinute] = morningTime.split(':').map(Number);
+    const [eveningHour, eveningMinute] = eveningTime.split(':').map(Number);
+    
+    const morningNotification = new Date();
+    morningNotification.setHours(morningHour, morningMinute, 0, 0);
+    
+    const eveningNotification = new Date();
+    eveningNotification.setHours(eveningHour, eveningMinute, 0, 0);
+    
+    const scheduleNotification = (time: Date, message: string) => {
+      const delay = time.getTime() - now.getTime();
+      if (delay > 0) {
+        setTimeout(() => {
+          new Notification('Glow Reminder', {
+            body: message,
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+          });
+        }, delay);
+      }
+    };
+    
+    if (morningNotification > now) {
+      scheduleNotification(morningNotification, 'Plan your day! Set your tasks and weights.');
+    }
+    
+    if (eveningNotification > now) {
+      scheduleNotification(eveningNotification, 'Log your progress! Update your task completion.');
+    }
+  }
+  
   async function savePreferences() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -55,6 +114,9 @@ const Settings = () => {
       toast.error("Failed to save preferences");
     } else {
       toast.success("Preferences saved!");
+      if (notificationsEnabled && browserNotificationsGranted) {
+        scheduleNotifications();
+      }
     }
   }
   
@@ -125,6 +187,29 @@ const Settings = () => {
           </div>
           
           <div className="space-y-4">
+            {!browserNotificationsGranted && (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground mb-2">
+                  Browser notifications are not enabled. Click below to enable them.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={requestNotificationPermission}
+                  className="w-full"
+                >
+                  Enable Browser Notifications
+                </Button>
+              </div>
+            )}
+            
+            {browserNotificationsGranted && (
+              <div className="p-3 bg-success/10 rounded-lg text-sm text-success flex items-center gap-2">
+                <span className="text-lg">✓</span>
+                Browser notifications enabled
+              </div>
+            )}
+            
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium">Enable Notifications</div>

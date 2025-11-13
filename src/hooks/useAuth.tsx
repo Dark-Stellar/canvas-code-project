@@ -31,6 +31,16 @@ export function useAuth() {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    // Clear local storage to prevent data leakage between accounts
+    localStorage.clear();
+    sessionStorage.clear();
+    // Clear IndexedDB
+    if ('indexedDB' in window) {
+      const dbs = await indexedDB.databases();
+      dbs.forEach(db => {
+        if (db.name) indexedDB.deleteDatabase(db.name);
+      });
+    }
     navigate("/auth");
   };
 

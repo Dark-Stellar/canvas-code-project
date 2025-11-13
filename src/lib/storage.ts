@@ -55,15 +55,21 @@ export async function saveDailyReport(report: DailyReport) {
     const { error } = await supabase
       .from('daily_reports')
       .upsert({
+        id: report.id,
         user_id: user.id,
         date: report.date,
         tasks: report.tasks as any,
         productivity_percent: report.productivityPercent,
         notes: report.notes,
         version: report.version,
+      }, {
+        onConflict: 'id'
       });
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error saving daily report:', error);
+      throw error;
+    }
   }
   
   // Also save locally as backup
