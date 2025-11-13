@@ -49,6 +49,23 @@ export async function initDB() {
 
 // Daily Reports
 export async function saveDailyReport(report: DailyReport) {
+  // Validate input before saving
+  if (report.notes && report.notes.length > 5000) {
+    throw new Error('Notes exceed maximum length of 5000 characters');
+  }
+  
+  for (const task of report.tasks) {
+    if (!task.title || task.title.length > 200) {
+      throw new Error('Task title must be 1-200 characters');
+    }
+    if (task.weight < 0 || task.weight > 100) {
+      throw new Error('Task weight must be between 0 and 100');
+    }
+    if (task.completionPercent < 0 || task.completionPercent > 100) {
+      throw new Error('Task completion must be between 0 and 100');
+    }
+  }
+
   const { data: { user } } = await supabase.auth.getUser();
   
   if (user) {
@@ -167,6 +184,24 @@ export async function getReportsInRange(startDate: string, endDate: string): Pro
 
 // Templates
 export async function saveTemplate(template: Template) {
+  // Validate input before saving
+  if (!template.title || template.title.length > 200) {
+    throw new Error('Template title must be 1-200 characters');
+  }
+  
+  if (template.description && template.description.length > 500) {
+    throw new Error('Template description must be less than 500 characters');
+  }
+  
+  for (const task of template.tasks) {
+    if (!task.title || task.title.length > 200) {
+      throw new Error('Task title must be 1-200 characters');
+    }
+    if (task.weight < 0 || task.weight > 100) {
+      throw new Error('Task weight must be between 0 and 100');
+    }
+  }
+
   const { data: { user } } = await supabase.auth.getUser();
   
   if (user) {
@@ -236,6 +271,16 @@ export async function deleteTemplate(id: string) {
 
 // Draft Tasks (work in progress for a specific date)
 export async function saveDraftTasks(date: string, tasks: Task[]) {
+  // Validate input before saving
+  for (const task of tasks) {
+    if (!task.title || task.title.length > 200) {
+      throw new Error('Task title must be 1-200 characters');
+    }
+    if (task.weight < 0 || task.weight > 100) {
+      throw new Error('Task weight must be between 0 and 100');
+    }
+  }
+
   const { data: { user } } = await supabase.auth.getUser();
   
   if (user) {

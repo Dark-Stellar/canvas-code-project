@@ -73,9 +73,22 @@ const Tasks = () => {
       return;
     }
     
-    if (tasks.some(t => !t.title.trim())) {
-      toast.error("All tasks must have a title");
-      return;
+    // Validate each task
+    for (const task of tasks) {
+      if (!task.title.trim()) {
+        toast.error("All tasks must have a title");
+        return;
+      }
+      
+      if (task.title.length > 200) {
+        toast.error("Task titles must be less than 200 characters");
+        return;
+      }
+
+      if (task.weight < 0 || task.weight > 100) {
+        toast.error("Weights must be between 0 and 100");
+        return;
+      }
     }
     
     const today = getTodayString();

@@ -67,6 +67,25 @@ const DayReport = () => {
   async function saveReport() {
     if (!date) return;
     
+    // Validate notes length
+    if (notes && notes.length > 5000) {
+      toast.error("Notes must be less than 5000 characters");
+      return;
+    }
+
+    // Validate tasks
+    for (const task of tasks) {
+      if (!task.title.trim() || task.title.length > 200) {
+        toast.error("Task titles must be 1-200 characters");
+        return;
+      }
+      
+      if (task.completionPercent < 0 || task.completionPercent > 100) {
+        toast.error("Completion must be between 0 and 100%");
+        return;
+      }
+    }
+    
     const productivity = calculateProductivity(tasks);
     
     const report: DailyReport = {
