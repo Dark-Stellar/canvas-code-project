@@ -67,8 +67,7 @@ export async function saveDailyReport(report: DailyReport) {
       });
     
     if (error) {
-      console.error('Error saving daily report:', error);
-      throw error;
+      throw new Error('Failed to save daily report');
     }
   }
   
@@ -251,8 +250,7 @@ export async function saveDraftTasks(date: string, tasks: Task[]) {
       });
     
     if (error) {
-      console.error('Error saving draft tasks:', error);
-      throw error;
+      throw new Error('Failed to save draft tasks');
     }
   }
   
