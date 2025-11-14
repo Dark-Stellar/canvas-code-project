@@ -9,6 +9,7 @@ import { Bell, Database, Info } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllDailyReports } from "@/lib/storage";
+import { scheduleNotifications } from "@/lib/notifications";
 
 const Settings = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -34,7 +35,7 @@ const Settings = () => {
       setBrowserNotificationsGranted(permission === 'granted');
       if (permission === 'granted') {
         toast.success("Browser notifications enabled!");
-        scheduleNotifications();
+        scheduleAppNotifications();
       } else {
         toast.error("Notification permission denied");
       }
@@ -60,41 +61,9 @@ const Settings = () => {
   }
   
   
-  function scheduleNotifications() {
+  function scheduleAppNotifications() {
     if (!browserNotificationsGranted || !notificationsEnabled) return;
-    
-    // Schedule daily reminders (this is a simplified version)
-    // In production, you'd use a service worker or background task
-    const now = new Date();
-    const [morningHour, morningMinute] = morningTime.split(':').map(Number);
-    const [eveningHour, eveningMinute] = eveningTime.split(':').map(Number);
-    
-    const morningNotification = new Date();
-    morningNotification.setHours(morningHour, morningMinute, 0, 0);
-    
-    const eveningNotification = new Date();
-    eveningNotification.setHours(eveningHour, eveningMinute, 0, 0);
-    
-    const scheduleNotification = (time: Date, message: string) => {
-      const delay = time.getTime() - now.getTime();
-      if (delay > 0) {
-        setTimeout(() => {
-          new Notification('Glow Reminder', {
-            body: message,
-            icon: '/favicon.ico',
-            badge: '/favicon.ico',
-          });
-        }, delay);
-      }
-    };
-    
-    if (morningNotification > now) {
-      scheduleNotification(morningNotification, 'Plan your day! Set your tasks and weights.');
-    }
-    
-    if (eveningNotification > now) {
-      scheduleNotification(eveningNotification, 'Log your progress! Update your task completion.');
-    }
+    scheduleNotifications(morningTime, eveningTime, notificationsEnabled);
   }
   
   async function savePreferences() {
@@ -115,7 +84,7 @@ const Settings = () => {
     } else {
       toast.success("Preferences saved!");
       if (notificationsEnabled && browserNotificationsGranted) {
-        scheduleNotifications();
+        scheduleAppNotifications();
       }
     }
   }

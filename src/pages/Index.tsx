@@ -75,7 +75,7 @@ const Index = () => {
                   <Plus className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <div className="font-semibold">Plan Today</div>
+                  <div className="font-semibold">Edit Plan</div>
                   <div className="text-xs text-muted-foreground">Set up tasks</div>
                 </div>
               </div>

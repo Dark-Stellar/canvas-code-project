@@ -179,6 +179,8 @@ const DayReport = () => {
   }
   
   const productivity = calculateProductivity(tasks);
+  const totalWeight = tasks.reduce((sum, t) => sum + t.weight, 0);
+  const isValidWeight = Math.abs(totalWeight - 100) < 0.1;
   
   return (
     <MobileLayout>
@@ -193,8 +195,16 @@ const DayReport = () => {
           <p className="text-sm text-muted-foreground">Edit progress anytime</p>
         </div>
         
+        {!isValidWeight && tasks.length > 0 && (
+          <Card className="p-3 bg-destructive/10 border-destructive/20">
+            <p className="text-sm text-destructive text-center">
+              ⚠️ Total weight is {totalWeight.toFixed(1)}% (should be 100%)
+            </p>
+          </Card>
+        )}
+        
         <div className="flex justify-center py-4">
-          <ProgressRing progress={productivity} />
+          <ProgressRing progress={isValidWeight ? productivity : 0} />
         </div>
         
         <div className="space-y-3">

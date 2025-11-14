@@ -10,6 +10,7 @@ import { getDraftTasks, saveDraftTasks, normalizeWeights } from "@/lib/storage";
 import { getTodayString } from "@/lib/dates";
 import type { Task } from "@/types";
 import { toast } from "sonner";
+import { saveDefaultTemplate } from "@/lib/defaultTemplate";
 
 const Tasks = () => {
   const navigate = useNavigate();
@@ -93,7 +94,11 @@ const Tasks = () => {
     
     const today = getTodayString();
     await saveDraftTasks(today, tasks);
-    toast.success("Tasks saved!");
+    
+    // Save as default template for future dates
+    await saveDefaultTemplate(tasks);
+    
+    toast.success("Tasks saved as your default plan!");
     navigate("/");
   }
   
@@ -115,7 +120,7 @@ const Tasks = () => {
       <div className="container max-w-2xl mx-auto p-4 space-y-4">
         <div className="flex items-center justify-between pt-4">
           <div>
-            <h1 className="text-2xl font-bold">Plan Your Day</h1>
+            <h1 className="text-2xl font-bold">Edit Plan</h1>
             <p className="text-sm text-muted-foreground">Define tasks and weights</p>
           </div>
         </div>

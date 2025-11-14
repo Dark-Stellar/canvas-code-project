@@ -318,6 +318,17 @@ export async function getDraftTasks(date: string): Promise<Task[] | undefined> {
     if (!error && data) {
       return data.tasks as any as Task[];
     }
+    
+    // If no draft exists for this date, check for default template
+    const { data: templateData } = await supabase
+      .from('default_template')
+      .select('tasks')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    if (templateData && templateData.tasks) {
+      return templateData.tasks as any as Task[];
+    }
   }
   
   // Fallback to local storage
