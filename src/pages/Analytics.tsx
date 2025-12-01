@@ -13,6 +13,7 @@ const Analytics = () => {
   const navigate = useNavigate();
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
   
   useEffect(() => {
     loadAnalytics();
@@ -178,11 +179,12 @@ const Analytics = () => {
               <BarChart data={Array.from({ length: Math.min(4, Math.floor(reports.length / 7)) }, (_, i) => {
                 const weekReports = reports.slice(i * 7, (i + 1) * 7);
                 const avg = weekReports.reduce((sum, r) => sum + r.productivityPercent, 0) / weekReports.length;
+                const weekNum = Math.min(4, Math.floor(reports.length / 7)) - i;
                 return {
-                  week: `Week ${i + 1}`,
+                  week: i === 0 ? 'This Week' : `${weekNum} Week${weekNum > 1 ? 's' : ''} Ago`,
                   average: Math.round(avg)
                 };
-              }).reverse()}>
+              })}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis 
                   dataKey="week" 
@@ -231,18 +233,44 @@ const Analytics = () => {
             return { taskTitle, taskPerformance, avgCompletion };
           }).sort((a, b) => b.avgCompletion - a.avgCompletion);
           
+          const toggleTaskVisibility = (taskTitle: string) => {
+            setHiddenTasks(prev => {
+              const newSet = new Set(prev);
+              if (newSet.has(taskTitle)) {
+                newSet.delete(taskTitle);
+              } else {
+                newSet.add(taskTitle);
+              }
+              return newSet;
+            });
+          };
+          
           return (
             <Card className="p-4">
               <h3 className="font-semibold mb-3">Task Performance (Last 30 Days)</h3>
+              <p className="text-xs text-muted-foreground mb-4">Click on any task to hide/show its chart</p>
               <div className="space-y-6">
-                {taskData.map(({ taskTitle, taskPerformance, avgCompletion }) => (
-                  <div key={taskTitle}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium truncate flex-1">{taskTitle}</span>
-                      <span className="text-xs text-muted-foreground ml-2">
-                        Avg: {Math.round(avgCompletion)}%
-                      </span>
-                    </div>
+                {taskData.map(({ taskTitle, taskPerformance, avgCompletion }) => {
+                  const isHidden = hiddenTasks.has(taskTitle);
+                  return (
+                    <div key={taskTitle}>
+                      <button
+                        onClick={() => toggleTaskVisibility(taskTitle)}
+                        className="w-full flex items-center justify-between mb-2 p-2 rounded-lg hover:bg-accent/5 transition-colors"
+                      >
+                        <span className={`text-sm font-medium truncate flex-1 text-left ${isHidden ? 'text-muted-foreground' : ''}`}>
+                          {taskTitle}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            Avg: {Math.round(avgCompletion)}%
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {isHidden ? '(Hidden)' : '(Visible)'}
+                          </span>
+                        </div>
+                      </button>
+                      {!isHidden && (
                     <ResponsiveContainer width="100%" height={120}>
                       <LineChart data={taskPerformance}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -279,8 +307,10 @@ const Analytics = () => {
                         />
                       </LineChart>
                     </ResponsiveContainer>
-                  </div>
-                ))}
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </Card>
           );
