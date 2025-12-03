@@ -39,11 +39,23 @@ export interface UserPreferences {
 
 export interface ProductivityGoal {
   id: string;
-  goalType: 'weekly' | 'monthly';
+  goalType: 'daily' | 'weekly' | 'monthly';
   targetPercentage: number;
   startDate: string;
   endDate: string;
   createdAt: string;
+}
+
+export interface Mission {
+  id: string;
+  title: string;
+  description?: string;
+  progressPercent: number;
+  category: string;
+  targetDate?: string;
+  isCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const TASK_CATEGORIES = [
@@ -57,4 +69,16 @@ export const TASK_CATEGORIES = [
   'Other'
 ] as const;
 
+export const MISSION_CATEGORIES = [
+  'personal',
+  'career',
+  'health',
+  'learning',
+  'financial',
+  'creative',
+  'social',
+  'other'
+] as const;
+
 export type TaskCategory = typeof TASK_CATEGORIES[number];
+export type MissionCategory = typeof MISSION_CATEGORIES[number];
