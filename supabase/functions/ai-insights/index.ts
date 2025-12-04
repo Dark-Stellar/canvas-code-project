@@ -12,10 +12,10 @@ serve(async (req) => {
 
   try {
     const { reports } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
     
-    if (!LOVABLE_API_KEY) {
-      // Fallback to rule-based suggestions if no AI key
+    if (!GOOGLE_AI_API_KEY) {
+      console.log("No Google AI API key found, using rule-based suggestions");
       return new Response(
         JSON.stringify({ suggestions: generateRuleBasedSuggestions(reports) }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -27,22 +27,34 @@ ${JSON.stringify(reports.slice(0, 7))}
 
 Focus on: patterns, improvement areas, and encouragement. Be specific and practical.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "You are a productivity coach. Give brief, actionable advice based on data." },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_AI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `You are a productivity coach. Give brief, actionable advice based on data.\n\n${prompt}`,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 500,
+          },
+        }),
+      }
+    );
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Google AI API error:", response.status, errorText);
       return new Response(
         JSON.stringify({ suggestions: generateRuleBasedSuggestions(reports) }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -50,13 +62,16 @@ Focus on: patterns, improvement areas, and encouragement. Be specific and practi
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "";
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     
     // Parse suggestions from AI response
     const suggestions = content
-      .split(/\d+\.\s*|\n-\s*|\n•\s*/)
+      .split(/\d+\.\s*|\n-\s*|\n•\s*|\n\*\s*/)
       .filter((s: string) => s.trim().length > 10)
+      .map((s: string) => s.trim())
       .slice(0, 4);
+
+    console.log("AI suggestions generated successfully");
 
     return new Response(
       JSON.stringify({ suggestions: suggestions.length > 0 ? suggestions : generateRuleBasedSuggestions(reports) }),
