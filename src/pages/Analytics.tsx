@@ -4,7 +4,7 @@ import { MobileLayout } from "@/components/MobileLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getAllDailyReports } from "@/lib/storage";
-import { TrendingUp, Calendar as CalendarIcon, Target, Zap, Edit, Eye, EyeOff, Download, Image } from "lucide-react";
+import { TrendingUp, Calendar as CalendarIcon, Target, Zap, Edit, Eye, EyeOff, Download, Image, FileText } from "lucide-react";
 import type { DailyReport, ProductivityGoal } from "@/types";
 import { formatDisplayDate } from "@/lib/dates";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -197,6 +197,164 @@ const Analytics = () => {
       toast.error("Failed to export charts");
     }
   };
+
+  const exportAllStatsPDF = async () => {
+    try {
+      toast.loading("Generating PDF...");
+      
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
+      
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      
+      // Title
+      doc.setFontSize(24);
+      doc.setTextColor(139, 92, 246); // Primary purple
+      doc.text('Glow Analytics Report', pageWidth / 2, 20, { align: 'center' });
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth / 2, 28, { align: 'center' });
+      
+      // Summary Statistics
+      doc.setFontSize(16);
+      doc.setTextColor(0);
+      doc.text('Summary Statistics', 14, 45);
+      
+      const summaryData = [
+        ['All-time Average', `${Math.round(stats.avgProductivity)}%`],
+        ['7-day Average', `${Math.round(stats.avg7Days)}%`],
+        ['Current Streak (60%+)', `${stats.currentStreak} days`],
+        ['Total Days Tracked', `${stats.totalDays} days`],
+      ];
+      
+      if (stats.bestDay) {
+        summaryData.push(['Best Day', `${formatDisplayDate(new Date(stats.bestDay.date))} - ${Math.round(stats.bestDay.productivityPercent)}%`]);
+      }
+      
+      autoTable(doc, {
+        startY: 50,
+        head: [['Metric', 'Value']],
+        body: summaryData,
+        theme: 'striped',
+        headStyles: { fillColor: [139, 92, 246] },
+      });
+      
+      // Goals Progress
+      const activeGoals = goalProgress.filter(g => g.isActive);
+      if (activeGoals.length > 0) {
+        const finalY = (doc as any).lastAutoTable.finalY || 80;
+        doc.setFontSize(16);
+        doc.text('Active Goals', 14, finalY + 15);
+        
+        const goalsData = activeGoals.map(g => [
+          `${g.goalType.charAt(0).toUpperCase() + g.goalType.slice(1)} Goal`,
+          `${Math.round(g.avgProgress)}%`,
+          `${g.targetPercentage}%`,
+          `${g.daysLeft} days`,
+          g.avgProgress >= g.targetPercentage ? 'On Track' : 'Behind'
+        ]);
+        
+        autoTable(doc, {
+          startY: finalY + 20,
+          head: [['Goal Type', 'Current', 'Target', 'Days Left', 'Status']],
+          body: goalsData,
+          theme: 'striped',
+          headStyles: { fillColor: [139, 92, 246] },
+        });
+      }
+      
+      // Weekly Averages
+      if (weeklyData.length > 0) {
+        const finalY = (doc as any).lastAutoTable.finalY || 120;
+        doc.setFontSize(16);
+        doc.text('Weekly Averages', 14, finalY + 15);
+        
+        const weekData = weeklyData.map(w => [w.week, `${w.average}%`]);
+        
+        autoTable(doc, {
+          startY: finalY + 20,
+          head: [['Week', 'Average Productivity']],
+          body: weekData,
+          theme: 'striped',
+          headStyles: { fillColor: [139, 92, 246] },
+        });
+      }
+      
+      // Task Performance
+      if (taskData.length > 0) {
+        doc.addPage();
+        doc.setFontSize(16);
+        doc.text('Task Performance', 14, 20);
+        
+        const taskTableData = taskData.map(t => [
+          t.taskTitle.length > 30 ? t.taskTitle.substring(0, 30) + '...' : t.taskTitle,
+          `${Math.round(t.avgCompletion)}%`
+        ]);
+        
+        autoTable(doc, {
+          startY: 25,
+          head: [['Task', 'Avg Completion']],
+          body: taskTableData,
+          theme: 'striped',
+          headStyles: { fillColor: [139, 92, 246] },
+        });
+      }
+      
+      // Daily Reports (last 30 days)
+      if (reports.length > 0) {
+        const finalY = (doc as any).lastAutoTable.finalY || 80;
+        
+        // Check if we need a new page
+        if (finalY > 200) {
+          doc.addPage();
+          doc.setFontSize(16);
+          doc.text('Daily Reports (Last 30 Days)', 14, 20);
+        } else {
+          doc.setFontSize(16);
+          doc.text('Daily Reports (Last 30 Days)', 14, finalY + 15);
+        }
+        
+        const dailyData = reports.slice(0, 30).map(r => [
+          formatDisplayDate(new Date(r.date)),
+          `${Math.round(r.productivityPercent)}%`,
+          r.tasks.length.toString(),
+          r.tasks.filter(t => t.completionPercent === 100).length.toString()
+        ]);
+        
+        autoTable(doc, {
+          startY: finalY > 200 ? 25 : finalY + 20,
+          head: [['Date', 'Productivity', 'Total Tasks', 'Completed']],
+          body: dailyData,
+          theme: 'striped',
+          headStyles: { fillColor: [139, 92, 246] },
+        });
+      }
+      
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(
+          `Glow - Measure. Grow. Glow. | Page ${i} of ${pageCount}`,
+          pageWidth / 2,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        );
+      }
+      
+      doc.save(`glow-full-analytics-${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.dismiss();
+      toast.success("Full analytics PDF exported!");
+    } catch (error) {
+      toast.dismiss();
+      toast.error("Failed to export PDF");
+      console.error("PDF export error:", error);
+    }
+  };
   
   if (loading) {
     return (
@@ -218,10 +376,16 @@ const Analytics = () => {
             <h1 className="text-2xl font-bold">Analytics</h1>
             <p className="text-sm text-muted-foreground">Track your progress</p>
           </div>
-          <Button variant="outline" size="sm" onClick={exportCharts}>
-            <Image className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={exportCharts}>
+              <Image className="h-4 w-4 mr-2" />
+              PNG
+            </Button>
+            <Button variant="default" size="sm" onClick={exportAllStatsPDF}>
+              <FileText className="h-4 w-4 mr-2" />
+              PDF
+            </Button>
+          </div>
         </div>
         
         <div className="grid grid-cols-2 gap-3">
@@ -451,20 +615,15 @@ const Analytics = () => {
                               backgroundColor: 'hsl(var(--background))',
                               border: '1px solid hsl(var(--border))',
                               borderRadius: '8px',
-                              fontSize: '12px'
                             }}
-                            formatter={(value: number, name: string) => {
-                              if (name === 'completion') return [`${value}%`, 'Completion'];
-                              if (name === 'weight') return [`${value}%`, 'Weight'];
-                              return [value, name];
-                            }}
+                            formatter={(value: number) => [`${value}%`, 'Completion']}
                           />
                           <Line 
                             type="monotone" 
                             dataKey="completion" 
                             stroke="hsl(var(--primary))" 
                             strokeWidth={2}
-                            dot={{ fill: 'hsl(var(--primary))', r: 3 }}
+                            dot={{ fill: 'hsl(var(--primary))', r: 2 }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
@@ -476,28 +635,34 @@ const Analytics = () => {
           </Card>
         )}
         
+        {/* Daily Progress List */}
         <Card className="p-4">
-          <h3 className="font-semibold mb-3">Daily Progress (Editable)</h3>
-          <div className="space-y-3">
-            {reports.slice(0, 30).map((report) => (
-              <div key={report.id} className="flex items-center justify-between group">
-                <div className="text-sm">
-                  {formatDisplayDate(new Date(report.date))}
+          <h3 className="font-semibold mb-3">Daily Progress</h3>
+          <div className="space-y-2">
+            {reports.slice(0, 10).map((report) => (
+              <div 
+                key={report.date}
+                className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+              >
+                <div>
+                  <div className="font-medium text-sm">
+                    {formatDisplayDate(new Date(report.date))}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {report.tasks.length} tasks
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="text-sm font-medium">
+                  <div className={`text-lg font-bold ${
+                    report.productivityPercent >= 80 ? 'text-success' :
+                    report.productivityPercent >= 60 ? 'text-warning' :
+                    'text-destructive'
+                  }`}>
                     {Math.round(report.productivityPercent)}%
-                  </div>
-                  <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-primary rounded-full transition-all"
-                      style={{ width: `${report.productivityPercent}%` }}
-                    />
                   </div>
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                    size="sm"
                     onClick={() => navigate(`/day/${report.date}`)}
                   >
                     <Edit className="h-4 w-4" />
@@ -506,12 +671,6 @@ const Analytics = () => {
               </div>
             ))}
           </div>
-          
-          {reports.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No data yet. Start tracking your productivity!
-            </p>
-          )}
         </Card>
       </div>
     </MobileLayout>

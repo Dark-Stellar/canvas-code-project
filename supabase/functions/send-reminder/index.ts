@@ -2,8 +2,6 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@4.0.0";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -15,46 +13,71 @@ interface ReminderEmailRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  console.log("Send-reminder function called");
+  console.log("Send-reminder function called at:", new Date().toISOString());
+  console.log("Request method:", req.method);
   
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Check if RESEND_API_KEY is configured
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    if (!resendApiKey) {
+      console.error("RESEND_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ error: "Email service not configured. Please add RESEND_API_KEY in secrets." }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const resend = new Resend(resendApiKey);
+
     // Verify authenticated user
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
-      console.error("No authorization header");
+      console.error("No authorization header provided");
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized - no authorization header" }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error("Supabase environment variables not configured");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      console.error("Authentication failed:", authError?.message);
+      console.error("Authentication failed:", authError?.message || "No user found");
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized - invalid token" }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    const { email, type }: ReminderEmailRequest = await req.json();
+    console.log("Authenticated user:", user.id);
+
+    const body = await req.json();
+    const { email, type }: ReminderEmailRequest = body;
     
-    console.log(`Processing ${type} reminder for user ${user.id}`);
+    console.log(`Processing ${type} reminder for email: ${email}`);
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
-      console.error("Invalid email format");
+      console.error("Invalid email format:", email);
       return new Response(
         JSON.stringify({ error: "Valid email is required" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -64,9 +87,9 @@ const handler = async (req: Request): Promise<Response> => {
     // Validate type parameter
     const allowedTypes = ['morning', 'evening', 'test'];
     if (!type || !allowedTypes.includes(type)) {
-      console.error("Invalid reminder type");
+      console.error("Invalid reminder type:", type);
       return new Response(
-        JSON.stringify({ error: "Invalid reminder type" }),
+        JSON.stringify({ error: "Invalid reminder type. Must be: morning, evening, or test" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -78,16 +101,19 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile) {
-      console.error("Failed to fetch user profile:", profileError?.message);
+    if (profileError) {
+      console.error("Failed to fetch user profile:", profileError.message);
       return new Response(
         JSON.stringify({ error: "User profile not found" }),
         { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    if (profile.email !== email) {
+    const userEmail = profile?.email || user.email;
+    
+    if (userEmail !== email) {
       console.error("Email mismatch - user attempted to send to different address");
+      console.error("User email:", userEmail, "Requested email:", email);
       return new Response(
         JSON.stringify({ error: "Cannot send emails to addresses you don't own" }),
         { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -115,7 +141,7 @@ const handler = async (req: Request): Promise<Response> => {
         message = 'You have a reminder from Glow.';
     }
 
-    console.log(`Sending ${type} reminder email`);
+    console.log(`Sending ${type} email to ${email}...`);
 
     const emailResponse = await resend.emails.send({
       from: "Glow <onboarding@resend.dev>",
@@ -135,7 +161,7 @@ const handler = async (req: Request): Promise<Response> => {
           
           ${type !== 'test' ? `
           <div style="text-align: center; margin: 30px 0;">
-            <a href="https://eabsrzsexzphpsdbyiyq.lovable.app" 
+            <a href="${Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app') || 'https://glow.lovable.app'}" 
                style="background-color: #8B5CF6; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 16px;">
               Open Glow
             </a>
@@ -150,14 +176,14 @@ const handler = async (req: Request): Promise<Response> => {
           <div style="border-top: 1px solid #E5E7EB; margin-top: 30px; padding-top: 20px;">
             <p style="font-size: 12px; color: #9CA3AF; text-align: center; margin: 0;">
               You're receiving this because you have notifications enabled in Glow.<br/>
-              Track your daily productivity at <a href="https://eabsrzsexzphpsdbyiyq.lovable.app" style="color: #8B5CF6;">glow.lovable.app</a>
+              Track your daily productivity with Glow.
             </p>
           </div>
         </div>
       `,
     });
 
-    console.log("Email sent successfully:", emailResponse);
+    console.log("Email sent successfully:", JSON.stringify(emailResponse));
 
     return new Response(JSON.stringify({ success: true, data: emailResponse }), {
       status: 200,
@@ -167,9 +193,10 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
   } catch (error: any) {
-    console.error("Error sending reminder email:", error);
+    console.error("Error in send-reminder function:", error.message || error);
+    console.error("Error stack:", error.stack);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || "Failed to send email" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
