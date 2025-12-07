@@ -1,19 +1,24 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { MobileLayout } from "@/components/MobileLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getAllDailyReports } from "@/lib/storage";
-import { Brain, TrendingUp, Calendar, Award, Target, Sparkles, Lightbulb, BarChart3, RefreshCw } from "lucide-react";
+import { Brain, TrendingUp, Calendar, Award, Target, Sparkles, Lightbulb, BarChart3, RefreshCw, FileText, Image, Zap, BookOpen } from "lucide-react";
 import type { DailyReport } from "@/types";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { exportInsightsPDF, exportElementAsPNG } from "@/lib/exportUtils";
 
 const Insights = () => {
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiAnalysis, setAiAnalysis] = useState<string>("");
+  const [weeklyReview, setWeeklyReview] = useState<any>(null);
   const [loadingAI, setLoadingAI] = useState(false);
+  const [activeAIType, setActiveAIType] = useState<string>("");
+  const insightsRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     loadInsights();
@@ -67,27 +72,6 @@ const Insights = () => {
       }))
       .sort((a, b) => b.avg - a.avg)
       .slice(0, 5);
-  }, [reports]);
-  
-  // Category breakdown
-  const categoryPerformance = useMemo(() => {
-    const catStats: { [key: string]: { total: number; count: number } } = {};
-    reports.forEach(r => {
-      r.tasks.forEach(t => {
-        const cat = t.category || 'Other';
-        if (!catStats[cat]) catStats[cat] = { total: 0, count: 0 };
-        catStats[cat].total += t.completionPercent;
-        catStats[cat].count += 1;
-      });
-    });
-    
-    return Object.entries(catStats)
-      .map(([category, stats]) => ({
-        category,
-        avg: stats.total / stats.count,
-        count: stats.count
-      }))
-      .sort((a, b) => b.avg - a.avg);
   }, [reports]);
   
   // Consistency score
@@ -155,14 +139,16 @@ const Insights = () => {
     })).sort((a, b) => b.avg - a.avg);
   }, [bestDayOfWeek]);
   
-  // Generate AI suggestions
-  const generateAISuggestions = async () => {
+  // Generate AI suggestions with different types
+  const generateAISuggestions = async (type: string = "suggestions") => {
     if (reports.length < 3) {
       toast.error("Need at least 3 days of data for AI suggestions");
       return;
     }
     
     setLoadingAI(true);
+    setActiveAIType(type);
+    
     try {
       const recentData = reports.slice(0, 14).map(r => ({
         date: r.date,
@@ -171,22 +157,32 @@ const Insights = () => {
       }));
       
       const { data, error } = await supabase.functions.invoke('ai-insights', {
-        body: { reports: recentData }
+        body: { reports: recentData, type }
       });
       
       if (error) throw error;
       
-      if (data?.suggestions) {
+      if (type === "weekly-review" && data?.grade) {
+        setWeeklyReview(data);
+        toast.success("Weekly review generated!");
+      } else if (type === "deep-analysis" && data?.analysis) {
+        setAiAnalysis(data.analysis);
+        if (data.recommendations) {
+          setAiSuggestions(data.recommendations);
+        }
+        toast.success("Deep analysis complete!");
+      } else if (data?.suggestions) {
         setAiSuggestions(data.suggestions);
         toast.success("AI insights generated!");
       }
     } catch (error) {
       console.error('AI suggestions error:', error);
-      // Fallback to rule-based suggestions
       const suggestions = generateRuleBasedSuggestions();
       setAiSuggestions(suggestions);
+      toast.info("Generated local insights");
     } finally {
       setLoadingAI(false);
+      setActiveAIType("");
     }
   };
   
@@ -207,29 +203,44 @@ const Insights = () => {
       suggestions.push(`${worstDay.name}s tend to be your least productive days. Consider scheduling lighter tasks or using them for planning.`);
     }
     
-    const lowPerformingTasks = reports.slice(0, 14)
-      .flatMap(r => r.tasks)
-      .filter(t => t.completionPercent < 50);
-    
-    if (lowPerformingTasks.length > 5) {
-      const commonCategories = lowPerformingTasks.reduce((acc, t) => {
-        const cat = t.category || 'Other';
-        acc[cat] = (acc[cat] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      const worstCategory = Object.entries(commonCategories).sort((a, b) => b[1] - a[1])[0];
-      if (worstCategory) {
-        suggestions.push(`Consider breaking down ${worstCategory[0]} tasks into smaller, more manageable pieces.`);
-      }
-    }
-    
     if (suggestions.length === 0) {
       suggestions.push("Great job! Keep maintaining your current productivity habits.");
       suggestions.push(`Your best day is ${bestDayOfWeek.name} - schedule important tasks then for maximum output.`);
     }
     
     return suggestions;
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      toast.loading("Generating PDF...");
+      await exportInsightsPDF(
+        weeklySummary,
+        monthlySummary,
+        bestPerformingDays,
+        topTasks,
+        aiSuggestions,
+        consistencyScore
+      );
+      toast.dismiss();
+      toast.success("Insights exported as PDF!");
+    } catch (error) {
+      toast.dismiss();
+      toast.error("Failed to export PDF");
+    }
+  };
+
+  const handleExportPNG = async () => {
+    if (!insightsRef.current) return;
+    try {
+      toast.loading("Generating image...");
+      await exportElementAsPNG(insightsRef.current, "glow-insights");
+      toast.dismiss();
+      toast.success("Insights exported as PNG!");
+    } catch (error) {
+      toast.dismiss();
+      toast.error("Failed to export image");
+    }
   };
   
   if (loading) {
@@ -244,13 +255,23 @@ const Insights = () => {
   
   return (
     <MobileLayout>
-      <div className="container max-w-2xl mx-auto p-4 space-y-4">
-        <div className="pt-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Brain className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">Insights</h1>
+      <div className="container max-w-2xl mx-auto p-4 space-y-4" ref={insightsRef}>
+        <div className="pt-4 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Brain className="h-6 w-6 text-primary" />
+              <h1 className="text-2xl font-bold">Insights</h1>
+            </div>
+            <p className="text-sm text-muted-foreground">Discover your patterns</p>
           </div>
-          <p className="text-sm text-muted-foreground">Discover your patterns</p>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" onClick={handleExportPNG} title="Export as PNG">
+              <Image className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleExportPDF} title="Export as PDF">
+              <FileText className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         
         {reports.length < 7 && (
@@ -267,29 +288,110 @@ const Insights = () => {
           </Card>
         )}
         
-        {/* AI Suggestions */}
+        {/* AI Suggestions - Enhanced */}
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Lightbulb className="h-5 w-5 text-accent" />
-              <h3 className="font-semibold">AI-Powered Suggestions</h3>
+              <h3 className="font-semibold">AI-Powered Insights</h3>
             </div>
+          </div>
+          
+          {/* AI Action Buttons */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={generateAISuggestions}
+              onClick={() => generateAISuggestions("suggestions")}
               disabled={loadingAI}
+              className="flex flex-col h-auto py-2"
             >
-              {loadingAI ? (
+              {loadingAI && activeAIType === "suggestions" ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4 mr-1" />
-                  Generate
+                  <Sparkles className="h-4 w-4 mb-1" />
+                  <span className="text-xs">Quick Tips</span>
+                </>
+              )}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => generateAISuggestions("deep-analysis")}
+              disabled={loadingAI}
+              className="flex flex-col h-auto py-2"
+            >
+              {loadingAI && activeAIType === "deep-analysis" ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Zap className="h-4 w-4 mb-1" />
+                  <span className="text-xs">Deep Analysis</span>
+                </>
+              )}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => generateAISuggestions("weekly-review")}
+              disabled={loadingAI}
+              className="flex flex-col h-auto py-2"
+            >
+              {loadingAI && activeAIType === "weekly-review" ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <BookOpen className="h-4 w-4 mb-1" />
+                  <span className="text-xs">Weekly Review</span>
                 </>
               )}
             </Button>
           </div>
+
+          {/* Weekly Review Display */}
+          {weeklyReview && (
+            <div className="mb-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+                  <span className="text-lg font-bold text-primary">{weeklyReview.grade}</span>
+                </div>
+                <div>
+                  <div className="font-semibold text-sm">Weekly Grade</div>
+                  <div className="text-xs text-muted-foreground">Based on your performance</div>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm">
+                {weeklyReview.achievement && (
+                  <div className="flex gap-2">
+                    <Award className="h-4 w-4 text-success flex-shrink-0 mt-0.5" />
+                    <span>{weeklyReview.achievement}</span>
+                  </div>
+                )}
+                {weeklyReview.improvement && (
+                  <div className="flex gap-2">
+                    <Target className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+                    <span>{weeklyReview.improvement}</span>
+                  </div>
+                )}
+                {weeklyReview.actionItem && (
+                  <div className="flex gap-2">
+                    <Zap className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
+                    <span>{weeklyReview.actionItem}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* AI Analysis Display */}
+          {aiAnalysis && (
+            <div className="mb-4 p-3 bg-accent/5 rounded-lg">
+              <p className="text-sm">{aiAnalysis}</p>
+            </div>
+          )}
+
+          {/* Suggestions List */}
           {aiSuggestions.length > 0 ? (
             <div className="space-y-3">
               {aiSuggestions.map((suggestion, idx) => (
@@ -303,7 +405,7 @@ const Insights = () => {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">
-              Click "Generate" to get personalized productivity suggestions based on your data.
+              Click one of the buttons above to get personalized productivity insights.
             </p>
           )}
         </Card>
@@ -408,6 +510,38 @@ const Insights = () => {
           </div>
         </Card>
         
+        {/* Top Performing Tasks */}
+        {topTasks.length > 0 && (
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Award className="h-5 w-5 text-accent" />
+              <h3 className="font-semibold">Top Performing Tasks</h3>
+            </div>
+            <div className="space-y-3">
+              {topTasks.map((task, idx) => (
+                <div key={task.title} className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                    idx === 0 ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium truncate">{task.title}</span>
+                      <span className="text-sm font-bold">{Math.round(task.avg)}%</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{task.category || 'Other'}</span>
+                      <span>•</span>
+                      <span>{task.count}x</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+        
         {/* Consistency */}
         <Card className="p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -434,67 +568,15 @@ const Insights = () => {
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp className={`h-5 w-5 ${improvementTrend.improving ? 'text-success' : 'text-warning'}`} />
-              <h3 className="font-semibold">Recent Trend</h3>
+              <h3 className="font-semibold">Improvement Trend</h3>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className={`text-2xl font-bold ${improvementTrend.improving ? 'text-success' : 'text-warning'}`}>
-                  {improvementTrend.improving ? '+' : ''}{Math.round(improvementTrend.change)}%
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Change from first week to last week
-                </div>
+            <div className="flex items-center gap-2">
+              <div className={`text-2xl font-bold ${improvementTrend.improving ? 'text-success' : 'text-warning'}`}>
+                {improvementTrend.improving ? '+' : ''}{Math.round(improvementTrend.change)}%
               </div>
-              <div className="text-xs text-muted-foreground">
-                {improvementTrend.improving ? 'Improving! 📈' : 'Time to refocus 💪'}
+              <div className="text-sm text-muted-foreground">
+                {improvementTrend.improving ? 'improvement' : 'change'} from first week
               </div>
-            </div>
-          </Card>
-        )}
-        
-        {/* Top Tasks */}
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Award className="h-5 w-5 text-accent" />
-            <h3 className="font-semibold">Top Performing Tasks</h3>
-          </div>
-          <div className="space-y-3">
-            {topTasks.map((task, idx) => (
-              <div key={task.title} className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-accent/10 text-accent text-xs font-bold flex-shrink-0">
-                  {idx + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{task.title}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {task.category || 'Other'} • {task.count} times
-                  </div>
-                </div>
-                <div className="text-sm font-bold text-success flex-shrink-0">
-                  {Math.round(task.avg)}%
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-        
-        {/* Category Performance */}
-        {categoryPerformance.length > 0 && (
-          <Card className="p-4">
-            <h3 className="font-semibold mb-3">Category Breakdown</h3>
-            <div className="space-y-3">
-              {categoryPerformance.map((cat) => (
-                <div key={cat.category}>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">{cat.category}</span>
-                    <span className="text-muted-foreground">{Math.round(cat.avg)}%</span>
-                  </div>
-                  <Progress value={cat.avg} className="h-2" />
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {cat.count} task{cat.count > 1 ? 's' : ''} tracked
-                  </div>
-                </div>
-              ))}
             </div>
           </Card>
         )}
