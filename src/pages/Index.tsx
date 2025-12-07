@@ -1,18 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Plus, PlayCircle, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, PlayCircle, Calendar as CalendarIcon, Download, FileText, Image } from "lucide-react";
 import { MobileLayout } from "@/components/MobileLayout";
 import { ProgressRing } from "@/components/ProgressRing";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { getDailyReport, getDraftTasks, calculateProductivity } from "@/lib/storage";
+import { getDailyReport, getDraftTasks, calculateProductivity, getAllDailyReports } from "@/lib/storage";
 import { getTodayString } from "@/lib/dates";
-import type { Task } from "@/types";
+import { exportDashboardPDF, exportElementAsPNG } from "@/lib/exportUtils";
+import { toast } from "sonner";
+import type { Task, DailyReport } from "@/types";
 
 const Index = () => {
   const [todayTasks, setTodayTasks] = useState<Task[]>([]);
   const [productivity, setProductivity] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [reports, setReports] = useState<DailyReport[]>([]);
+  const dashboardRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     loadTodayData();
@@ -20,6 +24,10 @@ const Index = () => {
   
   async function loadTodayData() {
     const today = getTodayString();
+    
+    // Load all reports for stats
+    const allReports = await getAllDailyReports();
+    setReports(allReports.sort((a, b) => b.date.localeCompare(a.date)));
     
     // Check if there's a saved report for today
     const report = await getDailyReport(today);
@@ -37,6 +45,71 @@ const Index = () => {
     
     setLoading(false);
   }
+
+  // Calculate stats for export
+  const getExportStats = () => {
+    const totalDays = reports.length;
+    const avgProductivity = totalDays > 0
+      ? reports.reduce((sum, r) => sum + r.productivityPercent, 0) / totalDays
+      : 0;
+    
+    const last7Days = reports.slice(0, 7);
+    const avg7Days = last7Days.length > 0
+      ? last7Days.reduce((sum, r) => sum + r.productivityPercent, 0) / last7Days.length
+      : 0;
+    
+    const bestDay = reports.length > 0
+      ? reports.reduce((best, r) => r.productivityPercent > best.productivityPercent ? r : best)
+      : null;
+    
+    // Calculate streak
+    let currentStreak = 0;
+    const today = new Date();
+    for (let i = 0; i < reports.length; i++) {
+      const reportDate = new Date(reports[i].date);
+      const daysDiff = Math.floor((today.getTime() - reportDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysDiff === i && reports[i].productivityPercent >= 60) {
+        currentStreak++;
+      } else {
+        break;
+      }
+    }
+
+    return {
+      totalDays,
+      avgProductivity,
+      avg7Days,
+      currentStreak,
+      bestDay,
+      todayTasks,
+      todayProductivity: productivity
+    };
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      toast.loading("Generating PDF...");
+      await exportDashboardPDF(getExportStats(), reports);
+      toast.dismiss();
+      toast.success("Dashboard exported as PDF!");
+    } catch (error) {
+      toast.dismiss();
+      toast.error("Failed to export PDF");
+    }
+  };
+
+  const handleExportPNG = async () => {
+    if (!dashboardRef.current) return;
+    try {
+      toast.loading("Generating image...");
+      await exportElementAsPNG(dashboardRef.current, "glow-dashboard");
+      toast.dismiss();
+      toast.success("Dashboard exported as PNG!");
+    } catch (error) {
+      toast.dismiss();
+      toast.error("Failed to export image");
+    }
+  };
   
   if (loading) {
     return (
@@ -52,13 +125,23 @@ const Index = () => {
   
   return (
     <MobileLayout>
-      <div className="container max-w-2xl mx-auto p-4 space-y-6">
-        {/* Header */}
-        <div className="text-center pt-6 pb-2">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Glow
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">Measure. Grow. Glow.</p>
+      <div className="container max-w-2xl mx-auto p-4 space-y-6" ref={dashboardRef}>
+        {/* Header with Export */}
+        <div className="flex items-center justify-between pt-6 pb-2">
+          <div className="text-center flex-1">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Glow
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">Measure. Grow. Glow.</p>
+          </div>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" onClick={handleExportPNG} title="Export as PNG">
+              <Image className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleExportPDF} title="Export as PDF">
+              <FileText className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         
         {/* Progress Ring */}
@@ -114,7 +197,7 @@ const Index = () => {
           <Link to="/insights">
             <Card className="p-3 hover:bg-accent/5 transition-colors cursor-pointer">
               <div className="text-xs text-muted-foreground mb-1">Streak</div>
-              <div className="text-xl font-bold">3</div>
+              <div className="text-xl font-bold">{getExportStats().currentStreak}</div>
             </Card>
           </Link>
         </div>

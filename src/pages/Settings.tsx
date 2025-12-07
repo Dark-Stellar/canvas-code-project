@@ -1,17 +1,18 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { MobileLayout } from "@/components/MobileLayout";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Bell, Database, Info, Send, Moon, Sun, Monitor } from "lucide-react";
+import { Bell, Database, Info, Send, Moon, Sun, Monitor, FileText, Image, Volume2, VolumeX, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllDailyReports } from "@/lib/storage";
 import { scheduleNotifications, sendTestNotification } from "@/lib/notifications";
 import { useTheme } from "next-themes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { exportElementAsPNG } from "@/lib/exportUtils";
 
 const Settings = () => {
   const { theme, setTheme } = useTheme();
@@ -21,6 +22,12 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [browserNotificationsGranted, setBrowserNotificationsGranted] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [browserNotifications, setBrowserNotifications] = useState(true);
+  const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
+  const [quietHoursStart, setQuietHoursStart] = useState("22:00");
+  const [quietHoursEnd, setQuietHoursEnd] = useState("08:00");
+  const settingsRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     loadPreferences();
@@ -369,6 +376,19 @@ const Settings = () => {
     doc.save(`glow-productivity-report-${new Date().toISOString().split('T')[0]}.pdf`);
     toast.success("Detailed report exported as PDF!");
   }
+
+  const handleExportSettingsPNG = async () => {
+    if (!settingsRef.current) return;
+    try {
+      toast.loading("Generating image...");
+      await exportElementAsPNG(settingsRef.current, "glow-settings");
+      toast.dismiss();
+      toast.success("Settings exported as PNG!");
+    } catch (error) {
+      toast.dismiss();
+      toast.error("Failed to export image");
+    }
+  };
   
   if (loading) {
     return (
@@ -382,10 +402,15 @@ const Settings = () => {
   
   return (
     <MobileLayout>
-      <div className="container max-w-2xl mx-auto p-4 space-y-4">
-        <div className="pt-4">
-          <h1 className="text-2xl font-bold">Settings</h1>
-          <p className="text-sm text-muted-foreground">Manage your preferences</p>
+      <div className="container max-w-2xl mx-auto p-4 space-y-4" ref={settingsRef}>
+        <div className="pt-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Settings</h1>
+            <p className="text-sm text-muted-foreground">Manage your preferences</p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={handleExportSettingsPNG} title="Export as PNG">
+            <Image className="h-4 w-4" />
+          </Button>
         </div>
         
         {/* Dark Mode Card */}
@@ -475,6 +500,33 @@ const Settings = () => {
                 onCheckedChange={setNotificationsEnabled}
               />
             </div>
+
+            {/* Notification Channels */}
+            <div className="space-y-3 pt-2 border-t">
+              <div className="text-sm font-medium">Notification Channels</div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Browser Push</span>
+                </div>
+                <Switch 
+                  checked={browserNotifications}
+                  onCheckedChange={setBrowserNotifications}
+                  disabled={!notificationsEnabled}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Send className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Email</span>
+                </div>
+                <Switch 
+                  checked={emailNotifications}
+                  onCheckedChange={setEmailNotifications}
+                  disabled={!notificationsEnabled}
+                />
+              </div>
+            </div>
             
             <div className="space-y-2">
               <Label htmlFor="morning">Morning Reminder (Plan your day)</Label>
@@ -496,6 +548,46 @@ const Settings = () => {
                 onChange={(e) => setEveningTime(e.target.value)}
                 disabled={!notificationsEnabled}
               />
+            </div>
+
+            {/* Quiet Hours */}
+            <div className="space-y-3 pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <VolumeX className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm font-medium">Quiet Hours</div>
+                    <div className="text-xs text-muted-foreground">Pause notifications during set times</div>
+                  </div>
+                </div>
+                <Switch 
+                  checked={quietHoursEnabled}
+                  onCheckedChange={setQuietHoursEnabled}
+                  disabled={!notificationsEnabled}
+                />
+              </div>
+              {quietHoursEnabled && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Start</Label>
+                    <Input
+                      type="time"
+                      value={quietHoursStart}
+                      onChange={(e) => setQuietHoursStart(e.target.value)}
+                      disabled={!notificationsEnabled}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">End</Label>
+                    <Input
+                      type="time"
+                      value={quietHoursEnd}
+                      onChange={(e) => setQuietHoursEnd(e.target.value)}
+                      disabled={!notificationsEnabled}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             
             <Button onClick={savePreferences} className="w-full">
@@ -532,6 +624,7 @@ const Settings = () => {
           
           <div className="space-y-3">
             <Button variant="outline" className="w-full" onClick={handleExportAll}>
+              <FileText className="h-4 w-4 mr-2" />
               Export All Data (PDF)
             </Button>
             <p className="text-xs text-muted-foreground">
@@ -552,7 +645,7 @@ const Settings = () => {
           </div>
           
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p>Version 2.0</p>
+            <p>Version 2.1</p>
             <p className="text-xs">Measure. Grow. Glow.</p>
             <p className="text-xs">
               Track your daily productivity with weighted tasks and visual progress tracking.
