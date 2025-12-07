@@ -108,8 +108,8 @@ const Index = () => {
         {/* Header with Export */}
         <div className="flex items-center justify-between pt-6 pb-2">
           <div className="text-center flex-1">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">        Glow</h1>
-            <p className="text-sm text-muted-foreground mt-1">                        Measure. Grow. Glow.</p>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">          Glow</h1>
+            <p className="text-sm text-muted-foreground mt-1">                            Measure. Grow. Glow.</p>
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" onClick={handleExportPNG} title="Export as PNG">
