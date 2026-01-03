@@ -10,16 +10,16 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, icon: Icon, actions }: PageHeaderProps) {
   return (
-    <div className="pt-4 pb-2 flex items-center justify-between">
-      <div className="flex items-center gap-3">
+    <div className="pt-3 pb-2 flex items-center justify-between">
+      <div className="flex items-center gap-2.5">
         {Icon && (
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Icon className="h-5 w-5 text-primary" />
+          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Icon className="h-4.5 w-4.5 text-primary" />
           </div>
         )}
         <div>
-          <h1 className="text-2xl font-bold">{title}</h1>
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
+          <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
       </div>
       {actions && (

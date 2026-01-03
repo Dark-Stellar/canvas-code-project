@@ -5,12 +5,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getAllDailyReports } from "@/lib/storage";
-import { Brain, TrendingUp, Calendar, Award, Target, Sparkles, Lightbulb, BarChart3, RefreshCw, FileText, Zap, BookOpen, MessageCircle, Send, X } from "lucide-react";
+import { Brain, TrendingUp, Calendar, Award, Target, Sparkles, Lightbulb, BarChart3, RefreshCw, FileText, Zap, BookOpen, MessageCircle, Send, X, ArrowUp, ArrowDown } from "lucide-react";
 import type { DailyReport } from "@/types";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { exportInsightsPDF } from "@/lib/exportUtils";
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -104,7 +105,30 @@ const Insights = () => {
     const firstWeek = reports.slice(-7).reduce((sum, r) => sum + r.productivityPercent, 0) / 7;
     const lastWeek = reports.slice(0, 7).reduce((sum, r) => sum + r.productivityPercent, 0) / 7;
     const change = lastWeek - firstWeek;
-    return { change, improving: change > 0 };
+    
+    // Generate auto-details
+    const details: string[] = [];
+    if (change > 10) details.push("Strong upward momentum! Your productivity is significantly improving.");
+    else if (change > 5) details.push("Good progress! You're building better habits.");
+    else if (change > 0) details.push("Slight improvement. Keep pushing for consistency.");
+    else if (change > -5) details.push("Minor dip. Review your recent routines.");
+    else if (change > -10) details.push("Noticeable decline. Consider adjusting your workload.");
+    else details.push("Significant drop. Time to reassess priorities and take breaks if needed.");
+    
+    // Add streak insight
+    const recentStreak = reports.slice(0, 7).filter(r => r.productivityPercent >= 60).length;
+    if (recentStreak >= 6) details.push(`🔥 ${recentStreak}/7 days above 60% this week!`);
+    else if (recentStreak >= 4) details.push(`Good consistency: ${recentStreak}/7 productive days this week.`);
+    
+    return { change, improving: change > 0, details };
+  }, [reports]);
+  
+  // Trend data for charts
+  const trendChartData = useMemo(() => {
+    return reports.slice(0, 14).reverse().map(r => ({
+      date: new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      productivity: Math.round(r.productivityPercent)
+    }));
   }, [reports]);
   
   const weeklySummary = useMemo(() => {
@@ -526,8 +550,22 @@ const Insights = () => {
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <Award className="h-5 w-5 text-success" />
-              <h3 className="font-semibold">Performance by Day</h3>
+              <h3 className="font-semibold text-base">Performance by Day</h3>
             </div>
+            
+            {/* Bar Chart for day performance */}
+            <div className="mb-4">
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={allDaysPerformance.filter(d => d.count > 0)}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="shortName" fontSize={10} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis fontSize={9} stroke="hsl(var(--muted-foreground))" domain={[0, 100]} />
+                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                  <Bar dataKey="avg" fill="hsl(142, 76%, 36%)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            
             <div className="space-y-2">
               {allDaysPerformance.map((day) => (
                 <div key={day.name} className="flex items-center gap-3">
@@ -544,6 +582,22 @@ const Insights = () => {
                 </div>
               ))}
             </div>
+            
+            {/* Auto-generated insight */}
+            {(() => {
+              const best = allDaysPerformance.reduce((a, b) => (a.avg > b.avg && a.count > 0) ? a : b, allDaysPerformance[0]);
+              const worst = allDaysPerformance.reduce((a, b) => (b.avg < a.avg && b.count > 0 && a.count > 0) ? b : a, allDaysPerformance[0]);
+              if (best && worst && best.count > 0 && worst.count > 0) {
+                return (
+                  <div className="mt-4 p-3 bg-success/5 rounded-lg border border-success/20">
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">{best.name}</span> is your best day ({Math.round(best.avg)}%), while <span className="font-medium text-foreground">{worst.name}</span> tends to be lower ({Math.round(worst.avg)}%). Schedule important tasks on {best.name}s!
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </Card>
         )}
         
@@ -591,14 +645,50 @@ const Insights = () => {
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp className={`h-5 w-5 ${improvementTrend.improving ? 'text-success' : 'text-destructive'}`} />
-              <h3 className="font-semibold">Progress Trend</h3>
+              <h3 className="font-semibold text-base">Progress Trend</h3>
             </div>
-            <div className="flex items-center gap-2">
-              <span className={`text-2xl font-bold ${improvementTrend.improving ? 'text-success' : 'text-destructive'}`}>
-                {improvementTrend.improving ? '+' : ''}{Math.round(improvementTrend.change)}%
-              </span>
-              <span className="text-sm text-muted-foreground">compared to your first week</span>
+            
+            {/* Trend Chart */}
+            {trendChartData.length > 0 && (
+              <div className="mb-4">
+                <ResponsiveContainer width="100%" height={140}>
+                  <AreaChart data={trendChartData}>
+                    <defs>
+                      <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={improvementTrend.improving ? "hsl(142, 76%, 36%)" : "hsl(0, 70%, 50%)"} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={improvementTrend.improving ? "hsl(142, 76%, 36%)" : "hsl(0, 70%, 50%)"} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" fontSize={9} stroke="hsl(var(--muted-foreground))" interval="preserveStartEnd" />
+                    <YAxis fontSize={9} stroke="hsl(var(--muted-foreground))" domain={[0, 100]} />
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                    <Area type="monotone" dataKey="productivity" stroke={improvementTrend.improving ? "hsl(142, 76%, 36%)" : "hsl(0, 70%, 50%)"} strokeWidth={2} fill="url(#trendGradient)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full ${improvementTrend.improving ? 'bg-success/10' : 'bg-destructive/10'}`}>
+                {improvementTrend.improving ? <ArrowUp className="h-4 w-4 text-success" /> : <ArrowDown className="h-4 w-4 text-destructive" />}
+                <span className={`text-lg font-bold ${improvementTrend.improving ? 'text-success' : 'text-destructive'}`}>
+                  {improvementTrend.improving ? '+' : ''}{Math.round(improvementTrend.change)}%
+                </span>
+              </div>
+              <span className="text-sm text-muted-foreground">vs first week</span>
             </div>
+            
+            {/* Auto-generated details */}
+            {improvementTrend.details && improvementTrend.details.length > 0 && (
+              <div className="space-y-2">
+                {improvementTrend.details.map((detail, idx) => (
+                  <div key={idx} className={`p-2.5 rounded-lg text-sm ${improvementTrend.improving ? 'bg-success/5 border border-success/20' : 'bg-warning/5 border border-warning/20'}`}>
+                    {detail}
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         )}
       </div>

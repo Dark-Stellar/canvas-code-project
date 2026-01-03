@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getAllDailyReports } from "@/lib/storage";
-import { TrendingUp, Calendar as CalendarIcon, Target, Zap, Edit, Eye, EyeOff, FileText, BarChart3, PieChart, Activity, ArrowUp, ArrowDown } from "lucide-react";
+import { TrendingUp, Calendar as CalendarIcon, Target, Zap, Edit, Eye, EyeOff, FileText, BarChart3, PieChart, Activity, ArrowUp, ArrowDown, Flame, Trophy } from "lucide-react";
 import type { DailyReport, ProductivityGoal } from "@/types";
 import { formatDisplayDate } from "@/lib/dates";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPie, Cell, Pie, AreaChart, Area, Legend } from 'recharts';
@@ -79,6 +79,7 @@ const Analytics = () => {
     const bestDay = reports.length > 0 ? reports.reduce((best, r) => r.productivityPercent > best.productivityPercent ? r : best) : null;
     const worstDay = reports.length > 0 ? reports.reduce((worst, r) => r.productivityPercent < worst.productivityPercent ? r : worst) : null;
     
+    // Current streak (consecutive days >= 60%)
     let currentStreak = 0;
     const today = new Date();
     for (let i = 0; i < reports.length; i++) {
@@ -91,7 +92,40 @@ const Analytics = () => {
       }
     }
     
-    return { totalDays, avgProductivity, avg7Days, avgPrev7, weeklyChange, bestDay, worstDay, currentStreak };
+    // Longest streak ever
+    let longestStreak = 0;
+    let tempStreak = 0;
+    const sortedReports = [...reports].sort((a, b) => a.date.localeCompare(b.date));
+    for (let i = 0; i < sortedReports.length; i++) {
+      if (sortedReports[i].productivityPercent >= 60) {
+        tempStreak++;
+        if (i > 0) {
+          const prevDate = new Date(sortedReports[i - 1].date);
+          const currDate = new Date(sortedReports[i].date);
+          const daysDiff = Math.floor((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysDiff !== 1) {
+            tempStreak = 1;
+          }
+        }
+        longestStreak = Math.max(longestStreak, tempStreak);
+      } else {
+        tempStreak = 0;
+      }
+    }
+    
+    // Best week (highest 7-day average)
+    let bestWeekAvg = 0;
+    let bestWeekStart = '';
+    for (let i = 0; i <= reports.length - 7; i++) {
+      const weekReports = reports.slice(i, i + 7);
+      const weekAvg = weekReports.reduce((sum, r) => sum + r.productivityPercent, 0) / 7;
+      if (weekAvg > bestWeekAvg) {
+        bestWeekAvg = weekAvg;
+        bestWeekStart = weekReports[weekReports.length - 1].date;
+      }
+    }
+    
+    return { totalDays, avgProductivity, avg7Days, avgPrev7, weeklyChange, bestDay, worstDay, currentStreak, longestStreak, bestWeekAvg, bestWeekStart };
   }, [reports]);
   
   const trendData = useMemo(() => {
@@ -305,20 +339,20 @@ const Analytics = () => {
         
         {/* Key Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Target className="h-4 w-4 text-primary" />
+          <Card className="p-3.5">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Target className="h-3.5 w-3.5 text-primary" />
               </div>
             </div>
-            <div className="text-2xl font-bold">{Math.round(stats.avgProductivity)}%</div>
+            <div className="text-xl font-bold">{Math.round(stats.avgProductivity)}%</div>
             <div className="text-xs text-muted-foreground">All-time Average</div>
           </Card>
           
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                <TrendingUp className="h-4 w-4 text-accent" />
+          <Card className="p-3.5">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="h-7 w-7 rounded-lg bg-accent/10 flex items-center justify-center">
+                <TrendingUp className="h-3.5 w-3.5 text-accent" />
               </div>
               {stats.weeklyChange !== 0 && (
                 <span className={`text-xs font-medium flex items-center ${stats.weeklyChange > 0 ? 'text-success' : 'text-destructive'}`}>
@@ -327,28 +361,48 @@ const Analytics = () => {
                 </span>
               )}
             </div>
-            <div className="text-2xl font-bold">{Math.round(stats.avg7Days)}%</div>
+            <div className="text-xl font-bold">{Math.round(stats.avg7Days)}%</div>
             <div className="text-xs text-muted-foreground">7-day Average</div>
           </Card>
           
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center">
-                <Zap className="h-4 w-4 text-success" />
+          <Card className="p-3.5">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="h-7 w-7 rounded-lg bg-success/10 flex items-center justify-center">
+                <Zap className="h-3.5 w-3.5 text-success" />
               </div>
             </div>
-            <div className="text-2xl font-bold">{stats.currentStreak}</div>
-            <div className="text-xs text-muted-foreground">Day Streak (60%+)</div>
+            <div className="text-xl font-bold">{stats.currentStreak}</div>
+            <div className="text-xs text-muted-foreground">Current Streak</div>
           </Card>
           
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="h-8 w-8 rounded-lg bg-info/10 flex items-center justify-center">
-                <CalendarIcon className="h-4 w-4 text-info" />
+          <Card className="p-3.5">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="h-7 w-7 rounded-lg bg-warning/10 flex items-center justify-center">
+                <Flame className="h-3.5 w-3.5 text-warning" />
               </div>
             </div>
-            <div className="text-2xl font-bold">{stats.totalDays}</div>
+            <div className="text-xl font-bold">{stats.longestStreak}</div>
+            <div className="text-xs text-muted-foreground">Longest Streak</div>
+          </Card>
+          
+          <Card className="p-3.5">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="h-7 w-7 rounded-lg bg-info/10 flex items-center justify-center">
+                <CalendarIcon className="h-3.5 w-3.5 text-info" />
+              </div>
+            </div>
+            <div className="text-xl font-bold">{stats.totalDays}</div>
             <div className="text-xs text-muted-foreground">Total Days</div>
+          </Card>
+          
+          <Card className="p-3.5">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Trophy className="h-3.5 w-3.5 text-primary" />
+              </div>
+            </div>
+            <div className="text-xl font-bold">{stats.bestWeekAvg > 0 ? `${Math.round(stats.bestWeekAvg)}%` : '-'}</div>
+            <div className="text-xs text-muted-foreground">Best Week Avg</div>
           </Card>
         </div>
         
