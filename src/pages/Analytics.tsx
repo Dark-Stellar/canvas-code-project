@@ -324,7 +324,7 @@ const Analytics = () => {
   
   return (
     <MobileLayout>
-      <div className="container max-w-lg mx-auto px-4 py-3 space-y-3">
+      <div className="w-full max-w-lg mx-auto px-4 py-3 space-y-3">
         <PageHeader
           title="Stats"
           subtitle="Track your progress"

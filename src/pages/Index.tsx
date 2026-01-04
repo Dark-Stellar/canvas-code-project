@@ -119,7 +119,7 @@ const Index = () => {
 
   return (
     <MobileLayout>
-      <div className="container max-w-lg mx-auto px-4 py-3 space-y-4">
+      <div className="w-full max-w-lg mx-auto px-4 py-3 space-y-4">
         <PageHeader
           title="Glow"
           subtitle="Measure. Grow. Glow."

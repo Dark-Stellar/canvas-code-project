@@ -314,7 +314,7 @@ const Insights = () => {
   
   return (
     <MobileLayout>
-      <div className="container max-w-lg mx-auto px-4 py-3 space-y-3" ref={insightsRef}>
+      <div className="w-full max-w-lg mx-auto px-4 py-3 space-y-3" ref={insightsRef}>
         <PageHeader
           title="Insights"
           subtitle="Discover your patterns"

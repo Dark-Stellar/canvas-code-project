@@ -117,7 +117,7 @@ const Tasks = () => {
   
   return (
     <MobileLayout>
-      <div className="container max-w-2xl mx-auto p-4 space-y-4">
+      <div className="w-full max-w-2xl mx-auto px-4 py-4 space-y-4">
         <div className="flex items-center justify-between pt-4">
           <div>
             <h1 className="text-2xl font-bold">Edit Plan</h1>

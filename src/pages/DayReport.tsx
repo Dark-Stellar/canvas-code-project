@@ -155,7 +155,7 @@ const DayReport = () => {
   if (!tasks.length) {
     return (
       <MobileLayout>
-        <div className="container max-w-2xl mx-auto p-4 space-y-4">
+        <div className="w-full max-w-2xl mx-auto px-4 py-4 space-y-4">
           <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
@@ -184,7 +184,7 @@ const DayReport = () => {
   
   return (
     <MobileLayout>
-      <div className="container max-w-2xl mx-auto p-4 space-y-4">
+      <div className="w-full max-w-2xl mx-auto px-4 py-4 space-y-4">
         <Button variant="ghost" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
