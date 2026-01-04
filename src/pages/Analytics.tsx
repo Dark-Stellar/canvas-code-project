@@ -8,7 +8,7 @@ import { getAllDailyReports } from "@/lib/storage";
 import { TrendingUp, Calendar as CalendarIcon, Target, Zap, Edit, Eye, EyeOff, FileText, BarChart3, PieChart, Activity, ArrowUp, ArrowDown, Flame, Trophy } from "lucide-react";
 import type { DailyReport, ProductivityGoal } from "@/types";
 import { formatDisplayDate } from "@/lib/dates";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPie, Cell, Pie, AreaChart, Area, Legend } from 'recharts';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPie, Cell, Pie, AreaChart, Area } from 'recharts';
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
@@ -324,7 +324,7 @@ const Analytics = () => {
   
   return (
     <MobileLayout>
-      <div className="container max-w-2xl mx-auto p-4 space-y-4">
+      <div className="container max-w-lg mx-auto px-4 py-3 space-y-3">
         <PageHeader
           title="Stats"
           subtitle="Track your progress"

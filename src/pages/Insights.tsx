@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { exportInsightsPDF } from "@/lib/exportUtils";
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -123,14 +123,6 @@ const Insights = () => {
     return { change, improving: change > 0, details };
   }, [reports]);
   
-  // Trend data for charts
-  const trendChartData = useMemo(() => {
-    return reports.slice(0, 14).reverse().map(r => ({
-      date: new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      productivity: Math.round(r.productivityPercent)
-    }));
-  }, [reports]);
-  
   const weeklySummary = useMemo(() => {
     const last7 = reports.slice(0, 7);
     if (last7.length === 0) return null;
@@ -158,7 +150,7 @@ const Insights = () => {
     return { avgProductivity, bestDay, totalTasks, completedTasks, daysTracked: last30.length, weeks };
   }, [reports]);
   
-  // All 7 days performance
+  // All 7 days performance - sorted by best to worst
   const allDaysPerformance = useMemo(() => {
     const { dayScores, dayNames } = bestDayOfWeek;
     return dayNames.map((name, idx) => ({
@@ -166,7 +158,7 @@ const Insights = () => {
       shortName: name.substring(0, 3),
       avg: dayScores[idx] ? dayScores[idx].total / dayScores[idx].count : 0,
       count: dayScores[idx]?.count || 0
-    }));
+    })).filter(d => d.count > 0).sort((a, b) => b.avg - a.avg);
   }, [bestDayOfWeek]);
   
   const generateAISuggestions = useCallback(async (type: string = "suggestions") => {
@@ -322,7 +314,7 @@ const Insights = () => {
   
   return (
     <MobileLayout>
-      <div className="container max-w-2xl mx-auto p-4 space-y-4" ref={insightsRef}>
+      <div className="container max-w-lg mx-auto px-4 py-3 space-y-3" ref={insightsRef}>
         <PageHeader
           title="Insights"
           subtitle="Discover your patterns"
@@ -545,59 +537,37 @@ const Insights = () => {
           </Card>
         )}
         
-        {/* Best Days - All 7 days */}
-        {reports.length >= 7 && (
+        {/* Best Days - Sorted by performance */}
+        {reports.length >= 7 && allDaysPerformance.length > 0 && (
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <Award className="h-5 w-5 text-success" />
-              <h3 className="font-semibold text-base">Performance by Day</h3>
-            </div>
-            
-            {/* Bar Chart for day performance */}
-            <div className="mb-4">
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={allDaysPerformance.filter(d => d.count > 0)}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="shortName" fontSize={10} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis fontSize={9} stroke="hsl(var(--muted-foreground))" domain={[0, 100]} />
-                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
-                  <Bar dataKey="avg" fill="hsl(142, 76%, 36%)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <h3 className="font-semibold text-sm">Performance by Day</h3>
+              <span className="text-xs text-muted-foreground ml-auto">Best → Worst</span>
             </div>
             
             <div className="space-y-2">
-              {allDaysPerformance.map((day) => (
-                <div key={day.name} className="flex items-center gap-3">
-                  <div className="w-10 text-sm font-medium">{day.shortName}</div>
+              {allDaysPerformance.map((day, idx) => (
+                <div key={day.name} className="flex items-center gap-2">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-success/20 text-success' : idx === allDaysPerformance.length - 1 ? 'bg-destructive/20 text-destructive' : 'bg-muted text-muted-foreground'}`}>
+                    {idx + 1}
+                  </div>
+                  <div className="w-12 text-sm font-medium">{day.shortName}</div>
                   <div className="flex-1">
                     <Progress value={day.avg} className="h-2" />
                   </div>
-                  <div className="w-14 text-sm text-right font-medium">
-                    {day.count > 0 ? `${Math.round(day.avg)}%` : '-'}
-                  </div>
-                  <div className="w-8 text-xs text-muted-foreground text-right">
-                    ({day.count})
+                  <div className="w-12 text-sm text-right font-bold">
+                    {Math.round(day.avg)}%
                   </div>
                 </div>
               ))}
             </div>
             
-            {/* Auto-generated insight */}
-            {(() => {
-              const best = allDaysPerformance.reduce((a, b) => (a.avg > b.avg && a.count > 0) ? a : b, allDaysPerformance[0]);
-              const worst = allDaysPerformance.reduce((a, b) => (b.avg < a.avg && b.count > 0 && a.count > 0) ? b : a, allDaysPerformance[0]);
-              if (best && worst && best.count > 0 && worst.count > 0) {
-                return (
-                  <div className="mt-4 p-3 bg-success/5 rounded-lg border border-success/20">
-                    <p className="text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">{best.name}</span> is your best day ({Math.round(best.avg)}%), while <span className="font-medium text-foreground">{worst.name}</span> tends to be lower ({Math.round(worst.avg)}%). Schedule important tasks on {best.name}s!
-                    </p>
-                  </div>
-                );
-              }
-              return null;
-            })()}
+            {allDaysPerformance.length >= 2 && (
+              <div className="mt-3 p-2 bg-success/5 rounded-lg text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{allDaysPerformance[0].name}</span> is your best day. Schedule key tasks then!
+              </div>
+            )}
           </Card>
         )}
         
@@ -640,34 +610,13 @@ const Insights = () => {
           </div>
         </Card>
         
-        {/* Improvement Trend */}
+        {/* Improvement Trend - Simplified */}
         {improvementTrend && (
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp className={`h-5 w-5 ${improvementTrend.improving ? 'text-success' : 'text-destructive'}`} />
-              <h3 className="font-semibold text-base">Progress Trend</h3>
+              <h3 className="font-semibold text-sm">Progress Trend</h3>
             </div>
-            
-            {/* Trend Chart */}
-            {trendChartData.length > 0 && (
-              <div className="mb-4">
-                <ResponsiveContainer width="100%" height={140}>
-                  <AreaChart data={trendChartData}>
-                    <defs>
-                      <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={improvementTrend.improving ? "hsl(142, 76%, 36%)" : "hsl(0, 70%, 50%)"} stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor={improvementTrend.improving ? "hsl(142, 76%, 36%)" : "hsl(0, 70%, 50%)"} stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" fontSize={9} stroke="hsl(var(--muted-foreground))" interval="preserveStartEnd" />
-                    <YAxis fontSize={9} stroke="hsl(var(--muted-foreground))" domain={[0, 100]} />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
-                    <Area type="monotone" dataKey="productivity" stroke={improvementTrend.improving ? "hsl(142, 76%, 36%)" : "hsl(0, 70%, 50%)"} strokeWidth={2} fill="url(#trendGradient)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            )}
             
             <div className="flex items-center gap-3 mb-3">
               <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full ${improvementTrend.improving ? 'bg-success/10' : 'bg-destructive/10'}`}>
@@ -679,11 +628,10 @@ const Insights = () => {
               <span className="text-sm text-muted-foreground">vs first week</span>
             </div>
             
-            {/* Auto-generated details */}
             {improvementTrend.details && improvementTrend.details.length > 0 && (
               <div className="space-y-2">
-                {improvementTrend.details.map((detail, idx) => (
-                  <div key={idx} className={`p-2.5 rounded-lg text-sm ${improvementTrend.improving ? 'bg-success/5 border border-success/20' : 'bg-warning/5 border border-warning/20'}`}>
+                {improvementTrend.details.slice(0, 2).map((detail, idx) => (
+                  <div key={idx} className={`p-2 rounded-lg text-xs ${improvementTrend.improving ? 'bg-success/5' : 'bg-warning/5'}`}>
                     {detail}
                   </div>
                 ))}
