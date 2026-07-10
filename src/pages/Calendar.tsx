@@ -12,7 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getAllDailyReports } from "@/lib/storage";
+import { useAllReports } from "@/hooks/useReports";
 import { getMonthDays, formatDate, isToday } from "@/lib/dates";
 import { format, addMonths, subMonths, addWeeks, subWeeks, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
 import type { DailyReport } from "@/types";
@@ -27,24 +27,13 @@ const Calendar = () => {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
-  const [reports, setReports] = useState<Record<string, DailyReport>>({});
-  const [allReports, setAllReports] = useState<DailyReport[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  useEffect(() => {
-    loadReports();
-  }, []);
-  
-  const loadReports = useCallback(async () => {
-    const fetchedReports = await getAllDailyReports();
-    const reportsMap: Record<string, DailyReport> = {};
-    fetchedReports.forEach(report => {
-      reportsMap[report.date] = report;
-    });
-    setReports(reportsMap);
-    setAllReports(fetchedReports.sort((a, b) => b.date.localeCompare(a.date)));
-    setLoading(false);
-  }, []);
+  const { data: allReports = [], isLoading } = useAllReports();
+  const loading = isLoading && allReports.length === 0;
+  const reports = useMemo(() => {
+    const map: Record<string, DailyReport> = {};
+    for (const r of allReports) map[r.date] = r;
+    return map;
+  }, [allReports]);
   
   const monthDays = useMemo(() => getMonthDays(currentDate), [currentDate]);
   

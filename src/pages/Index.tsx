@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getDailyReport, getDraftTasks, calculateProductivity, getAllDailyReports } from "@/lib/storage";
+import { getDailyReport, getDraftTasks, calculateProductivity } from "@/lib/storage";
+import { useAllReports } from "@/hooks/useReports";
 import { getTodayString } from "@/lib/dates";
 import { exportDashboardPDF } from "@/lib/exportUtils";
 import { toast } from "sonner";
@@ -25,9 +26,9 @@ const Index = () => {
   const [todayTasks, setTodayTasks] = useState<Task[]>([]);
   const [productivity, setProductivity] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState<DailyReport[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [homeTab, setHomeTab] = useState<'overview' | 'focus'>('overview');
+  const { data: reports = [] } = useAllReports();
 
   useEffect(() => {
     let cancelled = false;
@@ -48,18 +49,14 @@ const Index = () => {
       })
       .catch(() => { if (!cancelled) setLoading(false); });
 
-    // Phase 2: load history + missions in background (non-blocking)
+    // Phase 2: load missions in background (reports come from React Query cache)
     (async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession(); const user = session?.user;
-        const [allReports, missionsResult] = await Promise.all([
-          getAllDailyReports(),
-          user
-            ? supabase.from('missions').select('*').eq('user_id', user.id).eq('is_completed', false).order('created_at', { ascending: false }).limit(3)
-            : Promise.resolve({ data: null as any }),
-        ]);
+        const missionsResult = user
+          ? await supabase.from('missions').select('*').eq('user_id', user.id).eq('is_completed', false).order('created_at', { ascending: false }).limit(3)
+          : { data: null as any };
         if (cancelled) return;
-        setReports(allReports.sort((a, b) => b.date.localeCompare(a.date)));
         if (missionsResult?.data) {
           setMissions(missionsResult.data.map((m: any) => ({
             id: m.id, title: m.title, description: m.description || undefined,
