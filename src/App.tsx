@@ -19,7 +19,32 @@ const Goals = lazy(() => import("./pages/Goals"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 10 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
+// Warm up route chunks on idle so switching pages is instant.
+if (typeof window !== "undefined") {
+  const prefetch = () => {
+    import("./pages/Tasks");
+    import("./pages/Calendar");
+    import("./pages/Analytics");
+    import("./pages/DayReport");
+    import("./pages/Insights");
+    import("./pages/Goals");
+    import("./pages/Settings");
+  };
+  const w = window as any;
+  if (w.requestIdleCallback) w.requestIdleCallback(prefetch, { timeout: 2000 });
+  else setTimeout(prefetch, 1500);
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
