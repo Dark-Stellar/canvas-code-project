@@ -4,7 +4,7 @@ import { MobileLayout } from "@/components/MobileLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getAllDailyReports } from "@/lib/storage";
+import { useAllReports } from "@/hooks/useReports";
 import { TrendingUp, Calendar as CalendarIcon, Target, Zap, Edit, Eye, EyeOff, FileText, BarChart3, PieChart, Activity, ArrowUp, ArrowDown, Flame, Award } from "lucide-react";
 import { calculateCurrentStreak } from "@/lib/streakUtils";
 import type { DailyReport, ProductivityGoal } from "@/types";
@@ -24,9 +24,9 @@ const CHART_COLORS = ['hsl(270, 60%, 45%)', 'hsl(45, 95%, 55%)', 'hsl(142, 76%, 
 
 const Analytics = () => {
   const navigate = useNavigate();
-  const [reports, setReports] = useState<DailyReport[]>([]);
   const [goals, setGoals] = useState<ProductivityGoal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: reports = [], isLoading } = useAllReports();
+  const loading = isLoading && reports.length === 0;
   const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(() => {
     const saved = localStorage.getItem(HIDDEN_TASKS_KEY);
     return saved ? new Set(JSON.parse(saved)) : new Set();
@@ -36,19 +36,12 @@ const Analytics = () => {
   const chartsRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    loadAnalytics();
     loadGoals();
   }, []);
   
   useEffect(() => {
     localStorage.setItem(HIDDEN_TASKS_KEY, JSON.stringify([...hiddenTasks]));
   }, [hiddenTasks]);
-  
-  const loadAnalytics = useCallback(async () => {
-    const allReports = await getAllDailyReports();
-    setReports(allReports.sort((a, b) => b.date.localeCompare(a.date)));
-    setLoading(false);
-  }, []);
   
   const loadGoals = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession(); const user = session?.user;

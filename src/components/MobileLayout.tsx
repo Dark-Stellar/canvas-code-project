@@ -1,9 +1,18 @@
-import { ReactNode } from "react";
+import { ReactNode, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Home, Calendar, BarChart3, Brain, Target, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+
+const routePreloaders: Record<string, () => Promise<unknown>> = {
+  "/": () => import("@/pages/Index"),
+  "/calendar": () => import("@/pages/Calendar"),
+  "/analytics": () => import("@/pages/Analytics"),
+  "/insights": () => import("@/pages/Insights"),
+  "/goals": () => import("@/pages/Goals"),
+  "/settings": () => import("@/pages/Settings"),
+};
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -12,6 +21,10 @@ interface MobileLayoutProps {
 export function MobileLayout({ children }: MobileLayoutProps) {
   const location = useLocation();
   const { signOut } = useAuth();
+  const prefetch = useCallback((path: string) => {
+    const load = routePreloaders[path];
+    if (load) load();
+  }, []);
   
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
@@ -56,6 +69,8 @@ export function MobileLayout({ children }: MobileLayoutProps) {
               <Link
                 key={path}
                 to={path}
+                onMouseEnter={() => prefetch(path)}
+                onTouchStart={() => prefetch(path)}
                 className={cn(
                   "flex flex-col items-center justify-center flex-1 min-w-[60px] h-full gap-1 transition-colors",
                   isActive ? "text-primary" : "text-muted-foreground"

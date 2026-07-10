@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { getDailyReport, getDraftTasks, saveDailyReport, calculateProductivity, clearDraftTasks } from "@/lib/storage";
+import { useInvalidateReports } from "@/hooks/useReports";
 import { formatDisplayDate } from "@/lib/dates";
 import type { Task, DailyReport } from "@/types";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ const DayReport = () => {
   const [notes, setNotes] = useState("");
   const [reportId, setReportId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const invalidateReports = useInvalidateReports();
   
   useEffect(() => {
     if (date) {
@@ -101,6 +103,7 @@ const DayReport = () => {
     await saveDailyReport(report);
     await clearDraftTasks(date);
     setReportId(report.id);
+    invalidateReports(date);
     toast.success("Progress saved!");
   }
   
