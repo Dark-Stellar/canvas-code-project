@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "sdk_version": "0.24.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://eabsrzsexzphpsdbyiyq.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "glow-mcp",
+      "version": "0.1.0",
+      "title": "Glow — Daily Productivity"
+    },
+    "tools": [
+      {
+        "name": "list_recent_reports",
+        "title": "List recent daily reports",
+        "description": "Return the signed-in user's most recent daily productivity reports (date, productivity_percent, tasks, notes).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "description": "Max number of reports to return (default 14)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_day_report",
+        "title": "Get a specific day's report",
+        "description": "Fetch the signed-in user's daily report for a specific YYYY-MM-DD date.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Local date in YYYY-MM-DD."
+            }
+          },
+          "required": [
+            "date"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "save_day_report",
+        "title": "Save a daily report",
+        "description": "Create or update the signed-in user's daily report for a date. Computes productivity as sum(weight*completionPercent)/100.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Local date in YYYY-MM-DD."
+            },
+            "tasks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "weight": {
+                    "type": "number"
+                  },
+                  "completionPercent": {
+                    "type": "number"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "weight",
+                  "completionPercent"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "description": "Task entries with weight (0-100) and completionPercent (0-100)."
+            },
+            "notes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "date",
+            "tasks"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_productivity_stats",
+        "title": "Get productivity stats",
+        "description": "Summary stats for the signed-in user: average productivity over the last N days, best/worst days, day count.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "description": "Lookback window in days (default 30)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_goals",
+        "title": "List productivity goals",
+        "description": "Return the signed-in user's productivity goals.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

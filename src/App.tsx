@@ -18,6 +18,7 @@ const Insights = lazy(() => import("./pages/Insights"));
 const Goals = lazy(() => import("./pages/Goals"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,6 +58,7 @@ const App = () => (
             <Suspense fallback={null}>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
                 <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
