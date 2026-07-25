@@ -434,6 +434,60 @@ export type Database = {
         }
         Relationships: []
       }
+      routine_days: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          segments: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          segments?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          segments?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      routine_templates: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          id: string
+          segments: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          id?: string
+          segments?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          segments?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       templates: {
         Row: {
           created_at: string
