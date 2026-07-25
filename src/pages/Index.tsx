@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { ProgressRing } from "@/components/ProgressRing";
 import { FocusTimer } from "@/components/FocusTimer";
 import { QuickStats } from "@/components/QuickStats";
+import { RoutineCard } from "@/components/RoutineCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -144,6 +145,8 @@ const Index = () => {
             </div>
             
             <QuickStats reports={reports} todayProductivity={productivity} />
+
+            <RoutineCard date={getTodayString()} />
 
             <React.Suspense fallback={null}>
               {reports.length >= 3 && <SmartSuggestions reports={reports} todayProductivity={productivity} />}

@@ -1,6 +1,6 @@
 import { ReactNode, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Calendar, BarChart3, Brain, Target, Settings, LogOut } from "lucide-react";
+import { Home, Calendar, BarChart3, Brain, Target, Settings, LogOut, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +12,7 @@ const routePreloaders: Record<string, () => Promise<unknown>> = {
   "/insights": () => import("@/pages/Insights"),
   "/goals": () => import("@/pages/Goals"),
   "/settings": () => import("@/pages/Settings"),
+  "/routine": () => import("@/pages/Routine"),
 };
 
 interface MobileLayoutProps {
@@ -28,6 +29,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
   
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
+    { path: "/routine", icon: Clock, label: "Routine" },
     { path: "/calendar", icon: Calendar, label: "Calendar" },
     { path: "/analytics", icon: BarChart3, label: "Stats" },
     { path: "/insights", icon: Brain, label: "Insights" },
