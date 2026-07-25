@@ -96,3 +96,26 @@ export const MISSION_CATEGORIES = [
 
 export type TaskCategory = typeof TASK_CATEGORIES[number];
 export type MissionCategory = typeof MISSION_CATEGORIES[number];
+
+export interface RoutineSegment {
+  id: string;
+  startMin: number; // 0..1440
+  endMin: number;   // 0..1440
+  taskId?: string;
+  title: string;
+  category?: string;
+  completed?: boolean;
+  note?: string;
+}
+
+export interface RoutineDay {
+  id?: string;
+  date: string; // YYYY-MM-DD
+  segments: RoutineSegment[];
+}
+
+export interface RoutineTemplate {
+  id?: string;
+  dayOfWeek: number; // 0..6 (Sun..Sat)
+  segments: RoutineSegment[];
+}
