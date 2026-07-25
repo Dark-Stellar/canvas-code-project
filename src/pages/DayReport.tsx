@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Download, Plus } from "lucide-react";
 import { MobileLayout } from "@/components/MobileLayout";
 import { ProgressRing } from "@/components/ProgressRing";
 import { TaskRow } from "@/components/TaskRow";
+import { RoutineCard } from "@/components/RoutineCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -254,7 +255,9 @@ const DayReport = () => {
         <div className="flex justify-center py-4">
           <ProgressRing progress={isValidWeight ? productivity : 0} />
         </div>
-        
+
+        <RoutineCard date={date!} title="Routine" showEditLink={false} />
+
         <div className="space-y-3">
           {tasks.map((task) => (
             <TaskRow

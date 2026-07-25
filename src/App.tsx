@@ -19,6 +19,7 @@ const Goals = lazy(() => import("./pages/Goals"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
+const Routine = lazy(() => import("./pages/Routine"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +42,7 @@ if (typeof window !== "undefined") {
     import("./pages/Insights");
     import("./pages/Goals");
     import("./pages/Settings");
+    import("./pages/Routine");
   };
   const w = window as any;
   if (w.requestIdleCallback) w.requestIdleCallback(prefetch, { timeout: 2000 });
@@ -67,6 +69,7 @@ const App = () => (
                 <Route path="/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
                 <Route path="/goals" element={<ProtectedRoute><Goals /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/routine" element={<ProtectedRoute><Routine /></ProtectedRoute>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
